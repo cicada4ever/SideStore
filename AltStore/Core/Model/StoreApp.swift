@@ -215,7 +215,6 @@ public class StoreApp: BaseEntity, Decodable
     
     /* Relationships */
     @NSManaged public var installedApp: InstalledApp?
-    @NSManaged public var newsItems: Set<NewsItem>
     
     @NSManaged @objc(source) public var _source: Source?
     @NSManaged public internal(set) var featuringSource: Source?

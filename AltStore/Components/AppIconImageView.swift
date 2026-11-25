@@ -82,8 +82,8 @@ class AppIconImageView: UIImageView
         switch self.style
         {
         case .icon:
-            // Based off of 60pt icon having 12pt radius.
-            let radius = self.bounds.height / 5
+            // Match LiveContainer's 60pt icon with a 16pt continuous corner radius.
+            let radius = self.bounds.height * (16.0 / 60.0)
             self.layer.cornerRadius = radius
             
         case .circular:

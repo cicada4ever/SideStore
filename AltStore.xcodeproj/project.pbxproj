@@ -138,12 +138,6 @@
 				"My Apps/tvOS/UpdateCollectionViewCell.xib" = (
 					tvos,
 				);
-				News/NewsCollectionViewCell.xib = (
-					ios,
-				);
-				News/tvOS/NewsCollectionViewCell.xib = (
-					tvos,
-				);
 				Settings/AboutPatreonHeaderView.xib = (
 					ios,
 				);

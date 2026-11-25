@@ -93,7 +93,13 @@ class AppBannerView: NibView
     private func initialize()
     {
         self.accessibilityView.accessibilityTraits.formUnion(.button)
-        
+
+        // Keep app-card typography scalable with the system text size.
+        self.titleLabel.font = UIFontMetrics(forTextStyle: .headline).scaledFont(for: .systemFont(ofSize: 16, weight: .bold))
+        self.subtitleLabel.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 13))
+        self.titleLabel.adjustsFontForContentSizeCategory = true
+        self.subtitleLabel.adjustsFontForContentSizeCategory = true
+
         self.isAccessibilityElement = false
         self.accessibilityElements = [self.accessibilityView, self.button].compactMap { $0 }
         
@@ -386,21 +392,104 @@ extension AppBannerView
         let accessibilityLabel = source.name + "\n" + subtitle
         self.accessibilityLabel = accessibilityLabel
     }
+
+    func updateAppearanceForAppIcon()
+    {
+        self.update()
+    }
+
 }
 
 private extension AppBannerView
 {
+    static func readableAppIconTextColor(for color: UIColor, traitCollection: UITraitCollection) -> UIColor
+    {
+        let resolvedColor = color.resolvedColor(with: traitCollection)
+        let systemBackground = UIColor.systemBackground.resolvedColor(with: traitCollection)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        var backgroundRed: CGFloat = 0
+        var backgroundGreen: CGFloat = 0
+        var backgroundBlue: CGFloat = 0
+        var backgroundAlpha: CGFloat = 0
+        resolvedColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        systemBackground.getRed(
+            &backgroundRed,
+            green: &backgroundGreen,
+            blue: &backgroundBlue,
+            alpha: &backgroundAlpha
+        )
+
+        red = 0.5 * red + 0.5 * backgroundRed
+        green = 0.5 * green + 0.5 * backgroundGreen
+        blue = 0.5 * blue + 0.5 * backgroundBlue
+        let brightness = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        let offset: CGFloat = brightness < 0.5 ? 0.4 : -0.4
+        return UIColor(
+            red: min(max(red + offset, 0), 1),
+            green: min(max(green + offset, 0), 1),
+            blue: min(max(blue + offset, 0), 1),
+            alpha: 1
+        )
+    }
+
+    static func appIconAccentColor(from image: UIImage?) -> UIColor?
+    {
+        guard let cgImage = image?.cgImage else { return nil }
+
+        var pixelData = [UInt8](repeating: 0, count: 4)
+        guard let context = CGContext(
+            data: &pixelData,
+            width: 1,
+            height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+
+        let averageColor = UIColor(
+            red: CGFloat(pixelData[0]) / 255,
+            green: CGFloat(pixelData[1]) / 255,
+            blue: CGFloat(pixelData[2]) / 255,
+            alpha: 1
+        )
+
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        averageColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+
+        guard brightness >= 0.1 || saturation >= 0.1 else {
+            return .systemRed
+        }
+
+        return UIColor(hue: hue, saturation: saturation, brightness: max(brightness, 0.3), alpha: 1)
+    }
+
     func update()
     {
         self.clipsToBounds = true
         self.layer.cornerRadius = 22
+        self.layer.cornerCurve = .continuous
+        self.backgroundEffectView.layer.cornerCurve = .continuous
         
         let tintColor = self.originalTintColor ?? self.tintColor
-        self.subtitleLabel.textColor = tintColor
-        
+
         switch self.style
         {
         case .app:
+            // Like LiveContainer, let each app's icon provide a restrained accent
+            // for its own card while preserving the system material in the content layer.
+            let accentColor = Self.appIconAccentColor(from: self.iconImageView.image) ?? tintColor ?? .systemBlue
+            self.subtitleLabel.textColor = Self.readableAppIconTextColor(for: accentColor, traitCollection: self.traitCollection)
             self.directionalLayoutMargins.trailing = self.stackView.directionalLayoutMargins.trailing
             
             self.iconImageViewHeightConstraint.constant = 60
@@ -411,9 +500,10 @@ private extension AppBannerView
             self.button.style = .pill
             
             self.backgroundEffectView.contentView.backgroundColor = UIColor(resource: .blurTint)
-            self.backgroundEffectView.backgroundColor = tintColor
+            self.backgroundEffectView.backgroundColor = accentColor.withAlphaComponent(0.5)
             
         case .source:
+            self.subtitleLabel.textColor = tintColor
             self.directionalLayoutMargins.trailing = 20
             
             self.iconImageViewHeightConstraint.constant = 44

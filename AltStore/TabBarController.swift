@@ -36,7 +36,9 @@ final class TabBarController: UITabBarController
         super.viewDidLoad()
         debugLog("[TabBarController] viewDidLoad()")
         
-        self.viewControllers?[Tab.myApps.rawValue].tabBarItem.image = UIImage(systemName: "square.grid.2x2.fill")
+        let appsTab = self.viewControllers?[Tab.myApps.rawValue].tabBarItem
+        appsTab?.title = NSLocalizedString("Apps", comment: "")
+        appsTab?.image = UIImage(systemName: "square.stack.3d.up.fill")
         self.viewControllers?[Tab.settings.rawValue].tabBarItem.image = UIImage(systemName: "gearshape.fill")
     }
     
@@ -69,9 +71,14 @@ extension TabBarController
 {
     @objc func presentSources(_ sender: Any)
     {
-        // Source management remains available to existing app operations, but its
-        // dedicated tab has been removed from the primary interface.
-        self.selectedIndex = Tab.settings.rawValue
+        guard let sourcesNavigationController = UIStoryboard(name: "Sources", bundle: nil)
+            .instantiateInitialViewController() as? UINavigationController else {
+            self.selectedIndex = Tab.settings.rawValue
+            return
+        }
+
+        sourcesNavigationController.modalPresentationStyle = .pageSheet
+        self.present(sourcesNavigationController, animated: true)
     }
 }
 

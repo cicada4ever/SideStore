@@ -6,6 +6,9 @@
 //  Copyright © 2019 Riley Testut. All rights reserved.
 //
 
+// Legacy Core Data migration type only. The current v18 model removes this entity;
+// keep the class available so older versioned stores can migrate through their historical schemas.
+
 @preconcurrency import UIKit
 import CoreData
 
@@ -13,6 +16,8 @@ import CoreData
 public class NewsItem: BaseEntity, Decodable
 {
     /* Properties */
+
+
     @NSManaged public var identifier: String
     @NSManaged public var date: Date
     

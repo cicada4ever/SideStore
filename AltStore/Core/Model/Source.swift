@@ -72,7 +72,6 @@ public class Source: BaseEntity, Decodable
     
     /* Relationships */
     @objc(apps) @NSManaged public private(set) var _apps: NSOrderedSet
-    @objc(newsItems) @NSManaged public private(set) var _newsItems: NSOrderedSet
     
     @objc(featuredApps) @NSManaged public private(set) var _featuredApps: NSOrderedSet
     @objc(hasFeaturedApps) @NSManaged private var _hasFeaturedApps: Bool
@@ -83,15 +82,6 @@ public class Source: BaseEntity, Decodable
         }
         set {
             self._apps = NSOrderedSet(array: newValue)
-        }
-    }
-    
-    @nonobjc public var newsItems: [NewsItem] {
-        get {
-            return self._newsItems.array as! [NewsItem]
-        }
-        set {
-            self._newsItems = NSOrderedSet(array: newValue)
         }
     }
     
@@ -120,7 +110,6 @@ public class Source: BaseEntity, Decodable
         case patreonURL
         
         case apps
-        case news
         case featuredApps
         case userInfo
         
@@ -177,33 +166,13 @@ public class Source: BaseEntity, Decodable
                 app.sortIndex = Int32(index)
             }
             self._apps = NSMutableOrderedSet(array: apps)
-            
-            let newsItems = try container.decodeIfPresent([NewsItem].self, forKey: .news) ?? []
-            for (index, item) in newsItems.enumerated()
-            {
-                item.sortIndex = Int32(index)
-            }
-                                
-            for newsItem in newsItems
-            {
-                guard let appID = newsItem.appID else { continue }
-                
-                if let storeApp = appsByID[appID]
-                {
-                    newsItem.storeApp = storeApp
-                }
-                else
-                {
-                    newsItem.storeApp = nil
-                }
-            }
-            self._newsItems = NSMutableOrderedSet(array: newsItems)
-            
+
+
             let featuredAppBundleIDs = try container.decodeIfPresent([String].self, forKey: .featuredApps)
             let featuredApps = featuredAppBundleIDs?.compactMap { appsByID[$0] }
             self.setFeaturedApps(featuredApps)
             
-            // Updates identifier + apps & newsItems
+            // Updates identifier + app relationships
             try self.setSourceURL(sourceURL)
             
             
@@ -285,7 +254,7 @@ public extension Source
     }
     
     var lastUpdatedDate: Date? {
-        let allDates = self.apps.compactMap { $0.latestAvailableVersion?.date } + self.newsItems.map { $0.date }
+        let allDates = self.apps.compactMap { $0.latestAvailableVersion?.date }
         
         let lastUpdatedDate = allDates.sorted().last
         return lastUpdatedDate
@@ -344,10 +313,6 @@ public extension Source
             app.sourceIdentifier = identifier
         }
         
-        for newsItem in self.newsItems
-        {
-            newsItem.sourceIdentifier = identifier
-        }
     }
 }
 
