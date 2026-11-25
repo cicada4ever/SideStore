@@ -1,5 +1,3 @@
-// Legacy Core Data migration type only. The current v18 model removes this entity;
-// keep the class available so older versioned stores can migrate through their historical schemas.
 //
 //  NewsItem.swift
 //  AltStore
@@ -15,6 +13,9 @@ import CoreData
 public class NewsItem: BaseEntity, Decodable
 {
     /* Properties */
+
+// Legacy Core Data migration type only. The current v18 model removes this entity;
+// keep the class available so older versioned stores can migrate through their historical schemas.
     @NSManaged public var identifier: String
     @NSManaged public var date: Date
     
