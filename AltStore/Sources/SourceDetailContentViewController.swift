@@ -17,7 +17,6 @@ extension SourceDetailContentViewController
 {
     private enum Section: Int
     {
-        case news
         case featuredApps
         case about
     }
@@ -34,7 +33,6 @@ class SourceDetailContentViewController: UICollectionViewController
     let source: Source
     
     private lazy var dataSource = self.makeDataSource()
-    private lazy var newsDataSource = self.makeNewsDataSource()
     private lazy var appsDataSource = self.makeAppsDataSource()
     private lazy var aboutDataSource = self.makeAboutDataSource()
     
@@ -62,7 +60,6 @@ class SourceDetailContentViewController: UICollectionViewController
         let collectionViewLayout = self.makeLayout(source: self.source)
         self.collectionView.collectionViewLayout = collectionViewLayout
         
-        self.collectionView.register(NewsCollectionViewCell.nib, forCellWithReuseIdentifier: "NewsCell")
         self.collectionView.register(TitleCollectionReusableView.self, forSupplementaryViewOfKind: ElementKind.title.rawValue, withReuseIdentifier: ElementKind.title.rawValue)
         self.collectionView.register(ButtonCollectionReusableView.self, forSupplementaryViewOfKind: ElementKind.button.rawValue, withReuseIdentifier: ElementKind.button.rawValue)
         
@@ -96,30 +93,6 @@ private extension SourceDetailContentViewController
                         
             switch section
             {
-            case .news:
-                guard !source.newsItems.isEmpty else { return nil }
-                
-                // Estimate height closer to actual NewsCollectionViewCell height to prevent collapsed cards.
-                let heightDimension: NSCollectionLayoutDimension = if #available(iOS 17, tvOS 17, *) {
-                    .uniformAcrossSiblings(estimate: 160) } else { .estimated(160)
-                }
-                let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: heightDimension)
-                let item = NSCollectionLayoutItem(layoutSize: itemSize)
-                
-                let groupWidth = layoutEnvironment.container.contentSize.width - sectionInset * 2
-                let groupSize = NSCollectionLayoutSize(widthDimension: .absolute(groupWidth), heightDimension: heightDimension)
-                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
-                
-                let buttonSize = NSCollectionLayoutSize(widthDimension: .estimated(60), heightDimension: .estimated(20))
-                let sectionFooter = NSCollectionLayoutBoundarySupplementaryItem(layoutSize: buttonSize, elementKind: ElementKind.button.rawValue, alignment: .bottomTrailing)
-                
-                let layoutSection = NSCollectionLayoutSection(group: group)
-                layoutSection.interGroupSpacing = 10
-                layoutSection.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: sectionInset, bottom: 4, trailing: sectionInset)
-                layoutSection.orthogonalScrollingBehavior = .groupPagingCentered
-                layoutSection.boundarySupplementaryItems = [sectionFooter]
-                return layoutSection
-                
             case .featuredApps:
                 // Always show Featured Apps section, even if there are no apps.
                 // guard !source.effectiveFeaturedApps.isEmpty else { return nil }
@@ -166,45 +139,7 @@ private extension SourceDetailContentViewController
     
     func makeDataSource() -> CompositeCollectionViewPrefetchingDataSource<NSManagedObject, UIImage>
     {
-        let dataSource = CompositeCollectionViewPrefetchingDataSource<NSManagedObject, UIImage>(dataSources: [self.newsDataSource, self.appsDataSource, self.aboutDataSource])
-        return dataSource
-    }
-    
-    func makeNewsDataSource() -> FetchedResultsCollectionViewDataSource<NewsItem>
-    {
-        let fetchRequest = NewsItem.sortedFetchRequest(for: self.source)
-        
-        let context = self.source.managedObjectContext ?? DatabaseManager.shared.viewContext
-        let dataSource = FetchedResultsCollectionViewDataSource(fetchRequest: fetchRequest, managedObjectContext: context)
-        dataSource.liveFetchLimit = 5
-        dataSource.cellIdentifierHandler = { _ in "NewsCell" }
-        dataSource.cellConfigurationHandler = { (cell, newsItem, indexPath) in
-            let cell = cell as! NewsCollectionViewCell
-            
-            // For some reason, setting cell.layoutMargins = .zero does not update cell.contentView.layoutMargins.
-            cell.layoutMargins = .zero
-            cell.contentView.layoutMargins = .zero
-            
-            cell.titleLabel.text = newsItem.title
-            cell.captionLabel.text = newsItem.caption
-            cell.contentBackgroundView.backgroundColor = newsItem.tintColor
-            
-            cell.imageView.image = nil
-            cell.imageView.isHidden = true
-            
-            cell.isAccessibilityElement = true
-            cell.accessibilityLabel = (cell.titleLabel.text ?? "") + ". " + (cell.captionLabel.text ?? "")
-            
-            if newsItem.storeApp != nil || newsItem.externalURL != nil
-            {
-                cell.accessibilityTraits.insert(.button)
-            }
-            else
-            {
-                cell.accessibilityTraits.remove(.button)
-            }
-        }
-        
+        let dataSource = CompositeCollectionViewPrefetchingDataSource<NSManagedObject, UIImage>(dataSources: [self.appsDataSource, self.aboutDataSource])
         return dataSource
     }
     
@@ -271,21 +206,9 @@ private extension SourceDetailContentViewController
 
 private extension SourceDetailContentViewController
 {
-    @objc func viewAllNews()
-    {
-        self.performSegue(withIdentifier: "showAllNews", sender: nil)
-    }
-    
     @objc func viewAllApps()
     {
         self.performSegue(withIdentifier: "showAllApps", sender: nil)
-    }
-    
-    @IBSegueAction
-    func makeNewsViewController(_ coder: NSCoder) -> UIViewController?
-    {
-        let newsViewController = NewsViewController(source: self.source, coder: coder)
-        return newsViewController
     }
     
     @IBSegueAction
@@ -306,13 +229,6 @@ extension SourceDetailContentViewController
         let kind = ElementKind(rawValue: kind)!
         switch (section, kind)
         {
-        case (.news, _):
-            let buttonView = supplementaryView as! ButtonCollectionReusableView
-            buttonView.button.setTitle(NSLocalizedString("View All", comment: ""), for: .normal)
-            
-            buttonView.button.removeTarget(self, action: nil, for: .primaryActionTriggered)
-            buttonView.button.addTarget(self, action: #selector(SourceDetailContentViewController.viewAllNews), for: .primaryActionTriggered)
-            
         case (.featuredApps, .title):
             let titleView = supplementaryView as! TitleCollectionReusableView
             titleView.label.text = NSLocalizedString("Featured Apps", comment: "")
@@ -339,17 +255,6 @@ extension SourceDetailContentViewController
         
         switch (section, item)
         {
-        case (.news, let newsItem as NewsItem):
-            if let externalURL = newsItem.externalURL
-            {
-                self.openWebURL(externalURL, preferredTintColor: newsItem.tintColor)
-            }
-            else if let storeApp = newsItem.storeApp
-            {
-                let appViewController = AppViewController.makeAppViewController(app: storeApp)
-                self.navigationController?.pushViewController(appViewController, animated: true)
-            }
-            
         case (.featuredApps, let storeApp as StoreApp):
             let appViewController = AppViewController.makeAppViewController(app: storeApp)
             self.navigationController?.pushViewController(appViewController, animated: true)
