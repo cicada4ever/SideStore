@@ -72,7 +72,6 @@ public class Source: BaseEntity, Decodable
     
     /* Relationships */
     @objc(apps) @NSManaged public private(set) var _apps: NSOrderedSet
-    @objc(newsItems) @NSManaged public private(set) var _newsItems: NSOrderedSet
     
     @objc(featuredApps) @NSManaged public private(set) var _featuredApps: NSOrderedSet
     @objc(hasFeaturedApps) @NSManaged private var _hasFeaturedApps: Bool
@@ -83,15 +82,6 @@ public class Source: BaseEntity, Decodable
         }
         set {
             self._apps = NSOrderedSet(array: newValue)
-        }
-    }
-    
-    @nonobjc public var newsItems: [NewsItem] {
-        get {
-            return self._newsItems.array as! [NewsItem]
-        }
-        set {
-            self._newsItems = NSOrderedSet(array: newValue)
         }
     }
     
@@ -177,10 +167,6 @@ public class Source: BaseEntity, Decodable
             }
             self._apps = NSMutableOrderedSet(array: apps)
 
-            // Source news feeds are intentionally ignored; retain an empty legacy relationship
-            // so existing Core Data schema and older installations remain compatible.
-            self._newsItems = NSOrderedSet()
-            
 
             let featuredAppBundleIDs = try container.decodeIfPresent([String].self, forKey: .featuredApps)
             let featuredApps = featuredAppBundleIDs?.compactMap { appsByID[$0] }
@@ -327,10 +313,6 @@ public extension Source
             app.sourceIdentifier = identifier
         }
         
-        for newsItem in self.newsItems
-        {
-            newsItem.sourceIdentifier = identifier
-        }
     }
 }
 
