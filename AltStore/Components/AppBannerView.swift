@@ -453,7 +453,7 @@ private extension AppBannerView
         case .app:
             // Like LiveContainer, let each app's icon provide a restrained accent
             // for its own card while preserving the system material in the content layer.
-            let accentColor = Self.appIconAccentColor(from: self.iconImageView.image) ?? tintColor
+            let accentColor = Self.appIconAccentColor(from: self.iconImageView.image) ?? tintColor ?? .systemBlue
             self.subtitleLabel.textColor = accentColor
             self.directionalLayoutMargins.trailing = self.stackView.directionalLayoutMargins.trailing
             
