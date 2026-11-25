@@ -21,7 +21,7 @@ fileprivate extension NSManagedObject
     }
     
     var sourceNewsItems: NSOrderedSet? {
-        let newsItems = self.value(forKey: #keyPath(Source._newsItems)) as? NSOrderedSet
+        let newsItems = self.value(forKey: "newsItems") as? NSOrderedSet
         return newsItems
     }
 }
@@ -40,7 +40,7 @@ fileprivate extension NSManagedObject
     
     func setNewsItemSourceID(_ sourceID: String)
     {
-        self.setValue(sourceID, forKey: #keyPath(NewsItem.sourceIdentifier))
+        self.setValue(sourceID, forKey: "sourceIdentifier")
     }
     
     func setAppVersionSourceID(_ sourceID: String)
