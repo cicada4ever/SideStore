@@ -460,6 +460,7 @@ private extension MyAppsViewController
             let cell = cell as! UpdateCollectionViewCell
             cell.bannerView.iconImageView.isIndicatingActivity = false
             cell.bannerView.iconImageView.image = image
+            cell.bannerView.updateAppearanceForAppIcon()
             
             if let error = error
             {
@@ -556,6 +557,7 @@ private extension MyAppsViewController
         dataSource.prefetchCompletionHandler = { (cell, image, indexPath, error) in
             let cell = cell as! InstalledAppCollectionViewCell
             cell.bannerView.iconImageView.image = image
+            cell.bannerView.updateAppearanceForAppIcon()
             cell.bannerView.iconImageView.isIndicatingActivity = false
         }
         
@@ -636,6 +638,7 @@ private extension MyAppsViewController
         dataSource.prefetchCompletionHandler = { (cell, image, indexPath, error) in
             let cell = cell as! InstalledAppCollectionViewCell
             cell.bannerView.iconImageView.image = image
+            cell.bannerView.updateAppearanceForAppIcon()
             cell.bannerView.iconImageView.isIndicatingActivity = false
         }
         
