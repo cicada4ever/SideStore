@@ -14,6 +14,10 @@ on:
     - cron: "0 0 * * *"
   workflow_dispatch:
 
+# The final Upload Release step creates/updates the fork's nightly release.
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true

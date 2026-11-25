@@ -2,228 +2,135 @@
 //  AppDetailWidget.swift
 //  AltWidgetExtension
 //
-//  Created by Riley Testut on 9/14/20.
-//  Copyright © 2020 Riley Testut. All rights reserved.
-//
 
-import WidgetKit
 import SwiftUI
+import WidgetKit
 
-struct AppDetailWidget: Widget
-{
-    private let kind: String = "AppDetail"
-    
-    init() {
-        debugLog("[AppDetailWidget] Initialized widget kind: AppDetail")
-    }
-    
-    public var body: some WidgetConfiguration {
-        // On iOS 16+ use AppIntentConfiguration — it correctly supports
-        // containerBackground and contentMarginsDisabled(), unlike the legacy
-        // IntentConfiguration which breaks on iOS 17+ with the
-        // "Please adopt containerBackground" error.
-        if #available(iOSApplicationExtension 17, *)
-        {
-            return AppIntentConfiguration(
-                kind: kind,
-                intent: SelectAppIntent.self,
-                provider: SelectAppTimelineProvider()
-            ) { entry in
+/// The LiveContainer status widget intentionally keeps the signing countdown
+/// independent of the expiry-free app widgets in this extension.
+struct AppDetailWidget: Widget {
+    private let kind = "AppDetail"
+
+    var body: some WidgetConfiguration {
+        if #available(iOSApplicationExtension 17, *) {
+            return AppIntentConfiguration(kind: kind,
+                                          intent: SelectAppIntent.self,
+                                          provider: SelectAppTimelineProvider()) { entry in
                 AppDetailWidgetView(apps: entry.apps, date: entry.date, isPlaceholder: entry.isPlaceholder)
             }
-            .supportedFamilies([.systemSmall])
-            .configurationDisplayName("App Status")
-            .description("View remaining days until your sideloaded apps expire. Tap the countdown timer to refresh them in the background.")
+            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+            .configurationDisplayName("LiveContainer Status")
+            .description("View LiveContainer's remaining signing time. Tap the countdown to refresh your apps.")
             .contentMarginsDisabled()
-        }
-        else
-        {
-            // Legacy path for iOS 15.
-            return IntentConfiguration(
-                kind: kind,
-                intent: ViewAppIntent.self,
-                provider: AppsTimelineProvider()
-            ) { entry in
+        } else {
+            return IntentConfiguration(kind: kind,
+                                       intent: ViewAppIntent.self,
+                                       provider: AppsTimelineProvider()) { entry in
                 AppDetailWidgetView(apps: entry.apps, date: entry.date, isPlaceholder: entry.isPlaceholder)
             }
-            .supportedFamilies([.systemSmall])
-            .configurationDisplayName("App Status")
-            .description("View remaining days until your sideloaded apps expire. Tap the countdown timer to refresh them in the background.")
+            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+            .configurationDisplayName("LiveContainer Status")
+            .description("View LiveContainer's remaining signing time. Tap the countdown to refresh your apps.")
         }
     }
 }
 
-private struct AppDetailWidgetView: View
-{
+private struct AppDetailWidgetView: View {
     let apps: [AppSnapshot]
     let date: Date
     let isPlaceholder: Bool
-    
+    @Environment(\.widgetFamily) private var family
+
     var body: some View {
         Group {
-            if let app = apps.first
-            {
+            if let app = apps.first {
                 let daysRemaining = app.expirationDate.numberOfCalendarDays(since: date)
-                    
-                GeometryReader { (geometry) in
-                    Group {
+                GeometryReader { geometry in
+                    if family == .systemSmall {
                         VStack(alignment: .leading) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                let imageHeight = geometry.size.height * 0.4
-                                
-                                AppIconView(icon: app.icon, imageHeight: imageHeight)
-                                
-                                Text(app.name.uppercased())
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.5)
-                            }
-                            .fixedSize(horizontal: false, vertical: true)
-                            .widgetAccentableIfAvailable()
-                            
+                            statusCopy(daysRemaining: daysRemaining, iconSize: geometry.size.height * 0.36)
                             Spacer(minLength: 0)
-                            
-                            HStack(alignment: .center) {
-                                let expirationText: Text = {
-                                    switch daysRemaining
-                                    {
-                                    case ..<0: return Text("Expired")
-                                    case 1: return Text("1 day")
-                                    default: return Text("\(daysRemaining) days")
-                                    }
-                                }()
-                                
-                                (
-                                    Text("Expires in\n")
-                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                        .foregroundColor(Color.white.opacity(0.45)) +
-                                    
-                                    expirationText
-                                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                        .foregroundColor(.white)
-                                )
-                                .lineLimit(2)
-                                .lineSpacing(1.0)
-                                .minimumScaleFactor(0.5)
-                                
-                                Spacer()
-                                
-                                if daysRemaining >= 0
-                                {
-                                    Countdown(startDate: app.refreshedDate,
-                                              endDate: app.expirationDate,
-                                              currentDate: date)
-                                        .font(.system(size: 20, weight: .semibold, design: .rounded))
-                                        .foregroundColor(Color.white)
-                                        .opacity(0.8)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                        .offset(x: 5)
-                                        .invalidatableContentIfAvailable()
-                                }
-                            }
-                            .fixedSize(horizontal: false, vertical: true)
-                            .activatesRefreshAllAppsIntent()
-                            .widgetAccentableIfAvailable()
+                            countdown(for: app, daysRemaining: daysRemaining)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .padding()
+                    } else {
+                        HStack(spacing: 20) {
+                            statusCopy(daysRemaining: daysRemaining, iconSize: family == .systemLarge ? 72 : 60)
+                            Spacer(minLength: 0)
+                            countdown(for: app, daysRemaining: daysRemaining)
+                                .scaleEffect(family == .systemLarge ? 1.35 : 1.1)
+                                .padding(.trailing, family == .systemLarge ? 24 : 10)
                         }
                         .padding()
                     }
                 }
-            }
-            else
-            {
-                VStack(spacing: 4) {
-                    Text("Open SideStore")
-                        .font(.system(.subheadline, design: .rounded))
-                        .fontWeight(.semibold)
-                        .foregroundColor(Color.white.opacity(0.8))
+                .activatesRefreshAllAppsIntent()
+            } else {
+                VStack(spacing: 5) {
+                    LiveContainerIcon(size: 48)
+                    Text("Open LiveContainer")
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
                     Text("Launch app to update widget")
                         .font(.system(.caption2, design: .rounded))
-                        .foregroundColor(Color.white.opacity(0.5))
-                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.65))
                 }
-                .padding()
-                .unredacted()
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .widgetBackground(
-            backgroundView(
-                icon: apps.first?.icon,
-                tintColor: apps.first?.tintColor
-            )
-        )
+        .widgetBackground(LiveContainerWidgetBackground())
         .onAppear {
-            debugLog("[AppDetailWidgetView] onAppear: isPlaceholder=\(isPlaceholder), appsCount=\(apps.count), firstApp=\(apps.first?.name ?? "none"), date=\(date)")
+            debugLog("[AppDetailWidgetView] appsCount=\(apps.count), date=\(date)")
         }
     }
 
-    func backgroundView(icon: UIImage? = nil, tintColor: UIColor? = nil) -> some View
-    {
-        let defaultIcon = UIImage(named: "SideStore") ?? UIImage(systemName: "app.fill")!
-        let icon = icon ?? defaultIcon
-        let tintColor = tintColor ?? .gray
-        
-        let imageHeight = 60 as CGFloat
-        let saturation = 1.8
-        let blurRadius = 5 as CGFloat
-        let tintOpacity = 0.45
-        
-        // 1024x1024 images are not supported by previews but supported by device
-        // so we scale the image to 97% so as to reduce its actual size but not too much
-        // to somewhere below value, acceptable by previews ie < 1042x948
-        let scalingFactor = 0.97
-        
-        let resizedSize = CGSize(
-            width:  icon.size.width * scalingFactor,
-            height: icon.size.height * scalingFactor
-        )
-            
-        let resizedIcon = icon.resizing(to: resizedSize) ?? icon
-        
-        return ZStack(alignment: .topTrailing) {
-            // Blurred Image
-            GeometryReader { geometry in
-                ZStack {
-                    Image(uiImage: resizedIcon)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: imageHeight, height: imageHeight, alignment: .center)
-                        .saturation(saturation)
-                        .blur(radius: blurRadius, opaque: true)
-                        .scaleEffect(geometry.size.width / imageHeight, anchor: .center)
-                    
-                    Color(tintColor)
-                        .opacity(tintOpacity)
-                }
-            }
-            
-            Image("Badge")
-                .resizable()
-                .frame(width: 26, height: 26)
-                .padding()
+    @ViewBuilder
+    private func statusCopy(daysRemaining: Int, iconSize: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            LiveContainerIcon(size: iconSize)
+            Text("LIVECONTAINER")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Text("Expires in")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.62))
+            Text(daysRemaining < 0 ? "Expired" : "\(daysRemaining) day\(daysRemaining == 1 ? "" : "s")")
+                .font(.system(size: family == .systemLarge ? 30 : 22, weight: .bold, design: .rounded))
+        }
+        .foregroundStyle(.white)
+        .widgetAccentableIfAvailable()
+    }
+
+    @ViewBuilder
+    private func countdown(for app: AppSnapshot, daysRemaining: Int) -> some View {
+        if daysRemaining >= 0 {
+            Countdown(startDate: app.refreshedDate, endDate: app.expirationDate, currentDate: date)
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .invalidatableContentIfAvailable()
         }
     }
 }
 
-// In tinted/clear mode: luminanceToAlpha converts pixel brightness → opacity so
-// the system can overlay the accent colour. Must come BEFORE the mask so the
-// squircle corners are clipped after conversion (reverse order = corner bleed).
-// widgetAccentable() opts the result into the accent group.
-private struct AppIconView: View
-{
-    let icon: UIImage?
-    let imageHeight: CGFloat
+private struct LiveContainerIcon: View {
+    let size: CGFloat
 
     var body: some View {
-        let image = icon ?? UIImage(named: "SideStore") ?? UIImage(systemName: "app.fill")!
-        Image(uiImage: image)
+        Image("LiveContainer")
             .resizable()
-            .aspectRatio(CGSize(width: 1, height: 1), contentMode: .fit)
-            .frame(height: imageHeight)
-            .luminanceToAlphaInAccentedMode()
-            .mask(RoundedRectangle(cornerRadius: imageHeight / 5.0, style: .continuous))
-            .widgetAccentableIfAvailable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+    }
+}
+
+private struct LiveContainerWidgetBackground: View {
+    var body: some View {
+        LinearGradient(colors: [Color(red: 0.05, green: 0.15, blue: 0.33), Color(red: 0.13, green: 0.43, blue: 0.94)],
+                       startPoint: .topLeading,
+                       endPoint: .bottomTrailing)
     }
 }
 
@@ -231,13 +138,6 @@ private struct AppIconView: View
 #Preview(as: .systemSmall) {
     AppDetailWidget()
 } timeline: {
-    let expiredDate = Date().addingTimeInterval(1 * 60 * 60 * 24 * 7)
-    let (altstore, _, _, longAltStore, _, _) = AppSnapshot.makePreviewSnapshots()
-    AppsEntry<Void>(date: Date(), apps: [altstore])
-    AppsEntry<Void>(date: Date(), apps: [longAltStore])
-    
-    AppsEntry<Void>(date: expiredDate, apps: [altstore])
-    
-    AppsEntry<Void>(date: Date(), apps: [])
-    AppsEntry<Void>(date: Date(), apps: [], isPlaceholder: true)
+    let (app, _, _, _, _, _) = AppSnapshot.makePreviewSnapshots()
+    AppsEntry<Void>(date: Date(), apps: [app])
 }

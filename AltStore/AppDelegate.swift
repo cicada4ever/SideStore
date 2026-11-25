@@ -485,23 +485,15 @@ private extension AppDelegate
                                                                  #keyPath(InstalledApp.storeApp.latestSupportedVersion.version),
                                                                  #keyPath(InstalledApp.storeApp.latestSupportedVersion._buildVersion)]
                 
-                let previousNewsItemsFetchRequest = NewsItem.fetchRequest() as NSFetchRequest<NSFetchRequestResult>
-                previousNewsItemsFetchRequest.includesPendingChanges = false
-                previousNewsItemsFetchRequest.resultType = .dictionaryResultType
-                previousNewsItemsFetchRequest.propertiesToFetch = [#keyPath(NewsItem.identifier)]
-                
                 let previousUpdates = try context.fetch(previousUpdatesFetchRequest) as! [[String: String]]
-                let previousNewsItems = try context.fetch(previousNewsItemsFetchRequest) as! [[String: String]]
                 
                 try context.save()
                 
                 
                 
                 let updatesFetchRequest = InstalledApp.supportedUpdatesFetchRequest()
-                let newsItemsFetchRequest = NewsItem.fetchRequest() as NSFetchRequest<NewsItem>
                 
                 let updates = try context.fetch(updatesFetchRequest)
-                let newsItems = try context.fetch(newsItemsFetchRequest)
                 
                 #if !os(tvOS)
                 for update in updates
@@ -529,28 +521,6 @@ private extension AppDelegate
                     UNUserNotificationCenter.current().add(request)
                 }
                 
-                for newsItem in newsItems
-                {
-                    guard !previousNewsItems.contains(where: { $0[#keyPath(NewsItem.identifier)] == newsItem.identifier }) else { continue }
-                    guard !newsItem.isSilent else { continue }
-                    
-                    let content = UNMutableNotificationContent()
-                    
-                    if let app = newsItem.storeApp
-                    {
-                        content.title = String(format: NSLocalizedString("%@ News", comment: ""), app.name)
-                    }
-                    else
-                    {
-                        content.title = NSLocalizedString("SideStore News", comment: "")
-                    }
-                    
-                    content.body = newsItem.title
-                    content.sound = .default
-                    
-                    let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-                    UNUserNotificationCenter.current().add(request)
-                }
                 #else
                 DispatchQueue.main.async {
                     if UIApplication.shared.applicationState == .active {
