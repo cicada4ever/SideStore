@@ -120,7 +120,6 @@ public class Source: BaseEntity, Decodable
         case patreonURL
         
         case apps
-        case news
         case featuredApps
         case userInfo
         
@@ -178,27 +177,7 @@ public class Source: BaseEntity, Decodable
             }
             self._apps = NSMutableOrderedSet(array: apps)
             
-            let newsItems = try container.decodeIfPresent([NewsItem].self, forKey: .news) ?? []
-            for (index, item) in newsItems.enumerated()
-            {
-                item.sortIndex = Int32(index)
-            }
-                                
-            for newsItem in newsItems
-            {
-                guard let appID = newsItem.appID else { continue }
-                
-                if let storeApp = appsByID[appID]
-                {
-                    newsItem.storeApp = storeApp
-                }
-                else
-                {
-                    newsItem.storeApp = nil
-                }
-            }
-            self._newsItems = NSMutableOrderedSet(array: newsItems)
-            
+
             let featuredAppBundleIDs = try container.decodeIfPresent([String].self, forKey: .featuredApps)
             let featuredApps = featuredAppBundleIDs?.compactMap { appsByID[$0] }
             self.setFeaturedApps(featuredApps)
@@ -285,7 +264,7 @@ public extension Source
     }
     
     var lastUpdatedDate: Date? {
-        let allDates = self.apps.compactMap { $0.latestAvailableVersion?.date } + self.newsItems.map { $0.date }
+        let allDates = self.apps.compactMap { $0.latestAvailableVersion?.date }
         
         let lastUpdatedDate = allDates.sorted().last
         return lastUpdatedDate
