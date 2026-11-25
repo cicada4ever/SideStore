@@ -39,6 +39,11 @@ final class SourcesViewController: UICollectionViewController
     private var placeholderViewButton: UIButton!
     private var placeholderViewCenterYConstraint: NSLayoutConstraint!
     
+    @objc private func dismissSources()
+    {
+        self.dismiss(animated: true)
+    }
+
     override func viewDidLoad()
     {
         super.viewDidLoad()
@@ -52,6 +57,16 @@ final class SourcesViewController: UICollectionViewController
         // Set title
         navigationItem.title = "Sources"
         navigationController?.navigationBar.layoutMargins.left = 20
+
+        // Sources are now a secondary workflow rather than a top-level tab.
+        // Add a close affordance when this screen is presented as a sheet.
+        if self.navigationController?.presentingViewController != nil {
+            self.navigationItem.leftBarButtonItem = UIBarButtonItem(
+                barButtonSystemItem: .close,
+                target: self,
+                action: #selector(dismissSources)
+            )
+        }
         
         let layout = self.makeLayout()
         self.collectionView.collectionViewLayout = layout
