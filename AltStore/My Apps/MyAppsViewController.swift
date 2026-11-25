@@ -70,6 +70,8 @@ class MyAppsViewController: UICollectionViewController
     private var cachedUpdateSizes = [String: CGSize]()
     
     private var activeTeam: ALTTeam?
+    private var isGridLayout = UserDefaults.standard.bool(forKey: "SideStoreAppGridLayout")
+    private var appLayoutButton: UIBarButtonItem?
     
     required init?(coder aDecoder: NSCoder)
     {
@@ -89,6 +91,16 @@ class MyAppsViewController: UICollectionViewController
     override func viewDidLoad()
     {
         super.viewDidLoad()
+
+        let layoutButton = UIBarButtonItem(
+            image: UIImage(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2"),
+            style: .plain,
+            target: self,
+            action: #selector(toggleAppLayout)
+        )
+        layoutButton.accessibilityLabel = NSLocalizedString("Change app layout", comment: "")
+        appLayoutButton = layoutButton
+        navigationItem.rightBarButtonItems = (navigationItem.rightBarButtonItems ?? []) + [layoutButton]
         
         // Allows us to intercept delegate callbacks.
         self.updatesDataSource.fetchedResultsController.delegate = self
@@ -473,6 +485,7 @@ private extension MyAppsViewController
             let tintColor = installedApp.storeApp?.tintColor ?? .altPrimary
             
             let cell = cell as! InstalledAppCollectionViewCell
+            cell.bannerView.setGridPresentation(self.isGridLayout)
             cell.layoutMargins.left = self.view.layoutMargins.left
             cell.layoutMargins.right = self.view.layoutMargins.right
             cell.tintColor = tintColor
@@ -565,6 +578,7 @@ private extension MyAppsViewController
             let tintColor = installedApp.storeApp?.tintColor ?? .altPrimary
             
             let cell = cell as! InstalledAppCollectionViewCell
+            cell.bannerView.setGridPresentation(self.isGridLayout)
             cell.layoutMargins.left = self.view.layoutMargins.left
             cell.layoutMargins.right = self.view.layoutMargins.right
             cell.tintColor = UIColor.gray
@@ -1926,6 +1940,22 @@ private extension MyAppsViewController
 
 extension MyAppsViewController
 {
+    @objc private func toggleAppLayout()
+    {
+        isGridLayout.toggle()
+        UserDefaults.standard.set(isGridLayout, forKey: "SideStoreAppGridLayout")
+        appLayoutButton?.image = UIImage(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
+        appLayoutButton?.accessibilityLabel = NSLocalizedString(
+            isGridLayout ? "Show apps as a list" : "Show apps as a grid",
+            comment: ""
+        )
+
+        cachedUpdateSizes.removeAll()
+        collectionView.collectionViewLayout.invalidateLayout()
+        let appSections = IndexSet([Section.activeApps.rawValue, Section.inactiveApps.rawValue])
+        collectionView.reloadSections(appSections)
+    }
+
     override func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView
     {
         let section = Section(rawValue: indexPath.section)!
@@ -2003,7 +2033,10 @@ extension MyAppsViewController
             UIView.performWithoutAnimation {
                 headerView.layoutMargins.left = self.view.layoutMargins.left
                 headerView.layoutMargins.right = self.view.layoutMargins.right
-                
+                headerView.backgroundColor = .clear
+                headerView.textLabel.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
+                headerView.textLabel.textColor = .secondaryLabel
+                headerView.button.tintColor = .altPrimary
                 headerView.textLabel.text = NSLocalizedString("Inactive", comment: "")
                 headerView.button.setTitle(nil, for: .normal)
                 headerView.button.setImage(UIImage(systemName: "questionmark.circle"), for: .normal)
@@ -2438,6 +2471,12 @@ extension MyAppsViewController: UICollectionViewDelegateFlowLayout
             return size
             
         case .activeApps, .inactiveApps:
+            if self.isGridLayout {
+                let spacing: CGFloat = 12
+                let sideInset: CGFloat = 20
+                let width = max(140, floor((collectionView.bounds.width - (sideInset * 2) - spacing) / 2))
+                return CGSize(width: width, height: 174)
+            }
             return CGSize(width: collectionView.bounds.width, height: 88)
         }
     }

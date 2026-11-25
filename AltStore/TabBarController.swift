@@ -12,9 +12,6 @@ extension TabBarController
 {
     private enum Tab: Int, CaseIterable
     {
-        case news
-        case sources
-        case browse
         case myApps
         case settings
     }
@@ -26,14 +23,11 @@ final class TabBarController: UITabBarController
     
     private var _viewDidAppear = false
     
-    private var sourcesViewController: SourcesViewController!
-    
     required init?(coder aDecoder: NSCoder)
     {
         super.init(coder: aDecoder)
         
         NotificationCenter.default.addObserver(self, selector: #selector(TabBarController.importApp(_:)), name: AppDelegate.importAppDeepLinkNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(TabBarController.presentSources(_:)), name: AppDelegate.addSourceDeepLinkNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(TabBarController.openErrorLog(_:)), name: ToastView.openErrorLogNotification, object: nil)
     }
     
@@ -42,11 +36,8 @@ final class TabBarController: UITabBarController
         super.viewDidLoad()
         debugLog("[TabBarController] viewDidLoad()")
         
-        let browseNavigationController = self.viewControllers![Tab.browse.rawValue] as! UINavigationController
-        browseNavigationController.tabBarItem.image = UIImage(systemName: "bag")
-        
-        let sourcesNavigationController = self.viewControllers![Tab.sources.rawValue] as! UINavigationController
-        self.sourcesViewController = sourcesNavigationController.viewControllers.first as? SourcesViewController
+        self.viewControllers?[Tab.myApps.rawValue].tabBarItem.image = UIImage(systemName: "square.grid.2x2.fill")
+        self.viewControllers?[Tab.settings.rawValue].tabBarItem.image = UIImage(systemName: "gearshape.fill")
     }
     
     override func viewDidAppear(_ animated: Bool)
@@ -78,21 +69,9 @@ extension TabBarController
 {
     @objc func presentSources(_ sender: Any)
     {
-        if let presentedViewController = self.presentedViewController
-        {
-            presentedViewController.dismiss(animated: true) {
-                self.presentSources(sender)
-            }
-            
-            return
-        }
-                
-        if let notification = (sender as? Notification), let sourceURL = notification.userInfo?[AppDelegate.addSourceDeepLinkURLKey] as? URL
-        {
-            self.sourcesViewController?.deepLinkSourceURL = sourceURL
-        }
-        
-        self.selectedIndex = Tab.sources.rawValue
+        // Source management remains available to existing app operations, but its
+        // dedicated tab has been removed from the primary interface.
+        self.selectedIndex = Tab.settings.rawValue
     }
 }
 

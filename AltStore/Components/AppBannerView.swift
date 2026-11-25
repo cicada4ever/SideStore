@@ -120,6 +120,30 @@ class AppBannerView: NibView
         
         self.update()
     }
+
+    func setGridPresentation(_ enabled: Bool)
+    {
+        guard self.style == .app else { return }
+
+        self.stackView.axis = enabled ? .vertical : .horizontal
+        self.stackView.alignment = .center
+        self.stackView.spacing = enabled ? 6 : 11
+        self.stackView.directionalLayoutMargins = enabled
+            ? NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
+            : NSDirectionalEdgeInsets(top: 14, leading: 14, bottom: 14, trailing: 12)
+
+        self.directionalLayoutMargins = self.stackView.directionalLayoutMargins
+        self.iconImageViewHeightConstraint.constant = enabled ? 60 : 60
+        self.titleLabel.textAlignment = enabled ? .center : .natural
+        self.subtitleLabel.textAlignment = enabled ? .center : .natural
+        self.titleLabel.numberOfLines = enabled ? 2 : 1
+        self.subtitleLabel.numberOfLines = 1
+        self.button.titleLabel?.font = UIFont.systemFont(ofSize: enabled ? 12 : 14, weight: .bold)
+        self.backgroundEffectView.clipsToBounds = true
+        self.backgroundEffectView.layer.cornerRadius = 22
+        self.setNeedsLayout()
+        self.layoutIfNeeded()
+    }
 }
 
 extension AppBannerView
