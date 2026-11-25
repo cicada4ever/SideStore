@@ -36,7 +36,9 @@ final class TabBarController: UITabBarController
         super.viewDidLoad()
         debugLog("[TabBarController] viewDidLoad()")
         
-        self.viewControllers?[Tab.myApps.rawValue].tabBarItem.image = UIImage(systemName: "square.grid.2x2.fill")
+        let appsTab = self.viewControllers?[Tab.myApps.rawValue].tabBarItem
+        appsTab?.title = NSLocalizedString("Apps", comment: "")
+        appsTab?.image = UIImage(systemName: "square.stack.3d.up.fill")
         self.viewControllers?[Tab.settings.rawValue].tabBarItem.image = UIImage(systemName: "gearshape.fill")
     }
     
