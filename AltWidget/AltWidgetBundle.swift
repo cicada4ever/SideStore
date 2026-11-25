@@ -19,5 +19,6 @@ struct AltWidgetBundle: WidgetBundle
         TextLockScreenWidget()
         
         ActiveAppsWidget()
+        AppIconsWidget()
     }
 }
