@@ -14,7 +14,6 @@
         <scene sceneID="QxB-Dd-1xC">
             <objects>
                 <navigationController automaticallyAdjustsScrollViewInsets="NO" id="7We-99-yEv" customClass="ForwardingNavigationController" customModule="SideStore" customModuleProvider="target" sceneMemberID="viewController">
-                    <tabBarItem key="tabBarItem" title="Sources" image="Sources" id="xPv-dc-X4v"/>
                     <toolbarItems/>
                     <simulatedTabBarMetrics key="simulatedBottomBarMetrics"/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" largeTitles="YES" id="xWh-1U-u0q" customClass="NavigationBar" customModule="SideStore" customModuleProvider="target">
@@ -236,7 +235,6 @@
         <segue reference="LO9-iP-zZC"/>
     </inferredMetricsTieBreakers>
     <resources>
-        <image name="Sources" width="20" height="20"/>
         <systemColor name="systemBackgroundColor">
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>
