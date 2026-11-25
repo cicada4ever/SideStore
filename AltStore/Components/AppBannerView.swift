@@ -402,6 +402,39 @@ extension AppBannerView
 
 private extension AppBannerView
 {
+    static func readableAppIconTextColor(for color: UIColor, traitCollection: UITraitCollection) -> UIColor
+    {
+        let resolvedColor = color.resolvedColor(with: traitCollection)
+        let systemBackground = UIColor.systemBackground.resolvedColor(with: traitCollection)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        var backgroundRed: CGFloat = 0
+        var backgroundGreen: CGFloat = 0
+        var backgroundBlue: CGFloat = 0
+        var backgroundAlpha: CGFloat = 0
+        resolvedColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        systemBackground.getRed(
+            &backgroundRed,
+            green: &backgroundGreen,
+            blue: &backgroundBlue,
+            alpha: &backgroundAlpha
+        )
+
+        red = 0.5 * red + 0.5 * backgroundRed
+        green = 0.5 * green + 0.5 * backgroundGreen
+        blue = 0.5 * blue + 0.5 * backgroundBlue
+        let brightness = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        let offset: CGFloat = brightness < 0.5 ? 0.4 : -0.4
+        return UIColor(
+            red: min(max(red + offset, 0), 1),
+            green: min(max(green + offset, 0), 1),
+            blue: min(max(blue + offset, 0), 1),
+            alpha: 1
+        )
+    }
+
     static func appIconAccentColor(from image: UIImage?) -> UIColor?
     {
         guard let cgImage = image?.cgImage else { return nil }
@@ -445,6 +478,8 @@ private extension AppBannerView
     {
         self.clipsToBounds = true
         self.layer.cornerRadius = 22
+        self.layer.cornerCurve = .continuous
+        self.backgroundEffectView.layer.cornerCurve = .continuous
         
         let tintColor = self.originalTintColor ?? self.tintColor
 
@@ -454,7 +489,7 @@ private extension AppBannerView
             // Like LiveContainer, let each app's icon provide a restrained accent
             // for its own card while preserving the system material in the content layer.
             let accentColor = Self.appIconAccentColor(from: self.iconImageView.image) ?? tintColor ?? .systemBlue
-            self.subtitleLabel.textColor = accentColor
+            self.subtitleLabel.textColor = Self.readableAppIconTextColor(for: accentColor, traitCollection: self.traitCollection)
             self.directionalLayoutMargins.trailing = self.stackView.directionalLayoutMargins.trailing
             
             self.iconImageViewHeightConstraint.constant = 60
