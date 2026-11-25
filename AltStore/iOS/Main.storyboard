@@ -33,7 +33,6 @@
                     <tabBar key="tabBar" contentMode="scaleToFill" id="W28-zg-YXA">
                         <rect key="frame" x="0.0" y="975" width="768" height="49"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
-                        <color key="backgroundColor" red="0.0" green="0.0" blue="0.0" alpha="0.0" colorSpace="custom" customColorSpace="sRGB"/>
                     </tabBar>
                     <connections>
                         <segue destination="3Ew-ox-i4n" kind="relationship" relationship="viewControllers" id="phQ-Pc-pqw"/>
@@ -473,7 +472,7 @@
         <scene sceneID="nhh-BJ-XiT">
             <objects>
                 <navigationController automaticallyAdjustsScrollViewInsets="NO" id="3Ew-ox-i4n" customClass="ForwardingNavigationController" customModule="SideStore" customModuleProvider="target" sceneMemberID="viewController">
-                    <tabBarItem key="tabBarItem" title="My Apps" image="MyApps" id="4gT-9u-k7y">
+                    <tabBarItem key="tabBarItem" title="Apps" image="MyApps" id="4gT-9u-k7y">
                         <color key="badgeColor" name="Primary"/>
                     </tabBarItem>
                     <toolbarItems/>
