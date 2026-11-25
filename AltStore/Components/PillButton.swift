@@ -234,6 +234,16 @@ class PillButton: UIButton
         
         self.update()
     }
+
+    // Preserve the compact visual pill while providing Apple's recommended
+    // minimum 44-point touch target in both dimensions.
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool
+    {
+        let minimumHitDimension: CGFloat = 44
+        let horizontalExpansion = max(0, (minimumHitDimension - self.bounds.width) / 2)
+        let verticalExpansion = max(0, (minimumHitDimension - self.bounds.height) / 2)
+        return self.bounds.insetBy(dx: -horizontalExpansion, dy: -verticalExpansion).contains(point)
+    }
 }
 
 extension PillButton {
