@@ -44,7 +44,7 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <color key="backgroundColor" name="BlurTint"/>
                     </view>
-                    <blurEffect style="systemChromeMaterial"/>
+                    <blurEffect style="systemMaterial"/>
                 </visualEffectView>
                 <stackView opaque="NO" contentMode="scaleToFill" preservesSuperviewLayoutMargins="YES" insetsLayoutMarginsFromSafeArea="NO" alignment="center" spacing="11" translatesAutoresizingMaskIntoConstraints="NO" id="d1T-UD-gWG" userLabel="App Info">
                     <rect key="frame" x="0.0" y="0.0" width="375" height="88"/>
@@ -106,7 +106,7 @@
                                         </constraints>
                                     </view>
                                     <vibrancyEffect style="secondaryLabel">
-                                        <blurEffect style="systemChromeMaterial"/>
+                                        <blurEffect style="systemMaterial"/>
                                     </vibrancyEffect>
                                 </visualEffectView>
                             </subviews>
