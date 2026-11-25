@@ -71,9 +71,14 @@ extension TabBarController
 {
     @objc func presentSources(_ sender: Any)
     {
-        // Source management remains available to existing app operations, but its
-        // dedicated tab has been removed from the primary interface.
-        self.selectedIndex = Tab.settings.rawValue
+        guard let sourcesNavigationController = UIStoryboard(name: "Sources", bundle: nil)
+            .instantiateInitialViewController() as? UINavigationController else {
+            self.selectedIndex = Tab.settings.rawValue
+            return
+        }
+
+        sourcesNavigationController.modalPresentationStyle = .pageSheet
+        self.present(sourcesNavigationController, animated: true)
     }
 }
 
