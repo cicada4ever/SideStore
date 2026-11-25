@@ -176,7 +176,8 @@ public class Source: BaseEntity, Decodable
                 app.sortIndex = Int32(index)
             }
             self._apps = NSMutableOrderedSet(array: apps)
-                        // Source news feeds are intentionally ignored; retain an empty legacy relationship
+
+            // Source news feeds are intentionally ignored; retain an empty legacy relationship
             // so existing Core Data schema and older installations remain compatible.
             self._newsItems = NSOrderedSet()
             
@@ -185,7 +186,7 @@ public class Source: BaseEntity, Decodable
             let featuredApps = featuredAppBundleIDs?.compactMap { appsByID[$0] }
             self.setFeaturedApps(featuredApps)
             
-            // Updates identifier + apps & newsItems
+            // Updates identifier + app relationships
             try self.setSourceURL(sourceURL)
             
             
