@@ -43,55 +43,12 @@ class NavigationBar: UINavigationBar
     
     private func initialize()
     {
-        #if !os(tvOS)
-        let standardAppearance = UINavigationBarAppearance()
-        standardAppearance.configureWithDefaultBackground()
-        standardAppearance.shadowColor = nil
-        
-        let edgeAppearance = UINavigationBarAppearance()
-        edgeAppearance.configureWithOpaqueBackground()
-        edgeAppearance.backgroundColor = self.barTintColor
-        edgeAppearance.shadowColor = nil
-        
-        if let tintColor = self.barTintColor
-        {
-            let textAttributes = [NSAttributedString.Key.foregroundColor: UIColor.white]
-            
-            standardAppearance.backgroundColor = tintColor
-            standardAppearance.titleTextAttributes = textAttributes
-            standardAppearance.largeTitleTextAttributes = textAttributes
-            
-            edgeAppearance.titleTextAttributes = textAttributes
-            edgeAppearance.largeTitleTextAttributes = textAttributes
-        }
-        else
-        {
-            standardAppearance.backgroundColor = nil
-        }
-        
-        self.scrollEdgeAppearance = edgeAppearance
-        self.standardAppearance = standardAppearance
-        #else
+        #if os(tvOS)
         if let tintColor = self.barTintColor {
             self.barTintColor = tintColor
             self.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.white]
         }
         #endif
-    }
-    
-    override func layoutSubviews()
-    {
-        super.layoutSubviews()
-        
-        if self.automaticallyAdjustsItemPositions
-        {
-            // We can't easily shift just the back button up, so we shift the entire content view slightly.
-            for contentView in self.subviews
-            {
-                guard NSStringFromClass(type(of: contentView)).contains("ContentView") else { continue }
-                contentView.center.y -= 2
-            }
-        }
     }
     
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView?
