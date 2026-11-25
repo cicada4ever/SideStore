@@ -25,8 +25,6 @@ class NavigationBarAppearance: UINavigationBarAppearance
 
 class NavigationBar: UINavigationBar
 {    
-    @IBInspectable var automaticallyAdjustsItemPositions: Bool = true
-    
     override init(frame: CGRect)
     {
         super.init(frame: frame)
