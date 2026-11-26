@@ -60,7 +60,6 @@ final class TabBarController: UITabBarController, UITabBarControllerDelegate
         installButton.accessibilityLabel = NSLocalizedString("Install App", comment: "")
         installButton.accessibilityHint = NSLocalizedString("Choose an app file or install from a URL.", comment: "")
         installButton.layer.borderWidth = 0.5
-        installButton.layer.borderColor = UIColor.separator.cgColor
         installButton.addTarget(self, action: #selector(installAppTapped), for: .primaryActionTriggered)
 
         self.tabBar.addSubview(installButton)
@@ -71,6 +70,7 @@ final class TabBarController: UITabBarController, UITabBarControllerDelegate
             installButton.heightAnchor.constraint(equalToConstant: 54)
         ])
         self.installAppButton = installButton
+        self.updateInstallButtonAppearance()
         self.updateInstallButtonVisibility()
     }
     
@@ -92,6 +92,23 @@ final class TabBarController: UITabBarController, UITabBarControllerDelegate
     private func updateInstallButtonVisibility()
     {
         self.installAppButton?.isHidden = self.selectedIndex != Tab.myApps.rawValue
+    }
+
+    private func updateInstallButtonAppearance()
+    {
+        self.installAppButton?.layer.borderColor = UIColor.separator
+            .resolvedColor(with: self.traitCollection)
+            .cgColor
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?)
+    {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard
+            previousTraitCollection == nil ||
+            self.traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection)
+        else { return }
+        self.updateInstallButtonAppearance()
     }
 
     @objc private func installAppTapped()

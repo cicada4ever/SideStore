@@ -450,7 +450,7 @@ private extension MyAppsViewController
     {
         let dynamicDataSource = DynamicCollectionViewDataSource<InstalledApp>()
         dynamicDataSource.numberOfSectionsHandler = { 1 }
-        dynamicDataSource.numberOfItemsHandler = { _ in self.updatesDataSource.itemCount == 0 ? 1 : 0 }
+        dynamicDataSource.numberOfItemsHandler = { _ in self.unsupportedUpdates.isEmpty ? 0 : 1 }
         dynamicDataSource.cellIdentifierHandler = { _ in "NoUpdatesCell" }
         dynamicDataSource.dynamicCellConfigurationHandler = { (cell, indexPath) in
             let cell = cell as! NoUpdatesCollectionViewCell
@@ -1066,22 +1066,6 @@ private extension MyAppsViewController
         self.presentInstallAppMenu()
     }
 
-    func presentInstallAppMenu()
-    {
-        InstallAppDialog.presentSourceSelection(
-            from: self,
-            onChooseFiles: { [weak self] in
-                #if !os(tvOS)
-                self?.presentDocumentPicker()
-                #else
-                self?.presentTVWebTransfer()
-                #endif
-            },
-            onConfirm: { [weak self] url in
-                self?.sideloadApp(at: url) { _ in }
-            }
-        )
-    }
     
     #if !os(tvOS)
     private func presentDocumentPicker()
@@ -2050,6 +2034,23 @@ private extension MyAppsViewController
 
 extension MyAppsViewController
 {
+    func presentInstallAppMenu()
+    {
+        InstallAppDialog.presentSourceSelection(
+            from: self,
+            onChooseFiles: { [weak self] in
+                #if !os(tvOS)
+                self?.presentDocumentPicker()
+                #else
+                self?.presentTVWebTransfer()
+                #endif
+            },
+            onConfirm: { [weak self] url in
+                self?.sideloadApp(at: url) { _ in }
+            }
+        )
+    }
+
     func updateSearchResults(for searchController: UISearchController)
     {
         applyAppSearchAndSorting()
