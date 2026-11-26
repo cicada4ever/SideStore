@@ -71,7 +71,21 @@ class MyAppsViewController: UICollectionViewController
     
     private var activeTeam: ALTTeam?
     private var isGridLayout = UserDefaults.standard.bool(forKey: "SideStoreAppGridLayout")
-    private var appLayoutButton: UIBarButtonItem?
+    private var menuBarButtonItem: UIBarButtonItem?
+    private var activeAppsSearchPredicate: NSPredicate?
+    private var inactiveAppsSearchPredicate: NSPredicate?
+    private var updatesSearchPredicate: NSPredicate?
+
+    private lazy var appsSearchController: UISearchController = {
+        let controller = UISearchController(searchResultsController: nil)
+        controller.searchResultsUpdater = self
+        controller.obscuresBackgroundDuringPresentation = false
+        controller.searchBar.placeholder = NSLocalizedString("Search Apps", comment: "")
+        controller.searchBar.autocapitalizationType = .none
+        controller.searchBar.autocorrectionType = .no
+        controller.searchBar.returnKeyType = .done
+        return controller
+    }()
     
     required init?(coder aDecoder: NSCoder)
     {
@@ -92,20 +106,35 @@ class MyAppsViewController: UICollectionViewController
     {
         super.viewDidLoad()
 
-        let layoutButton = UIBarButtonItem(
-            image: UIImage(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2"),
-            style: .plain,
+        let installButton = UIBarButtonItem(
+            barButtonSystemItem: .add,
             target: self,
-            action: #selector(toggleAppLayout)
+            action: #selector(sideloadApp(_:))
         )
-        layoutButton.accessibilityLabel = NSLocalizedString("Change app layout", comment: "")
-        appLayoutButton = layoutButton
-        navigationItem.rightBarButtonItems = (navigationItem.rightBarButtonItems ?? []) + [layoutButton]
+        installButton.accessibilityLabel = NSLocalizedString("Install App", comment: "")
+        navigationItem.leftBarButtonItem = installButton
+
+        let menuButton = UIBarButtonItem(image: UIImage(systemName: "ellipsis.circle"), menu: UIMenu(title: "", children: []))
+        menuButton.accessibilityLabel = NSLocalizedString("More Options", comment: "")
+        menuBarButtonItem = menuButton
+        navigationItem.rightBarButtonItem = menuButton
+        configureNavigationMenu()
+
+        navigationItem.searchController = appsSearchController
+        navigationItem.hidesSearchBarWhenScrolling = false
+        definesPresentationContext = true
+        if #available(iOS 17.0, *) {
+            navigationItem.preferredSearchBarPlacement = .stacked
+        }
         
         // Allows us to intercept delegate callbacks.
         self.updatesDataSource.fetchedResultsController.delegate = self
         self.activeAppsDataSource.fetchedResultsController.delegate = self
         self.inactiveAppsDataSource.fetchedResultsController.delegate = self
+
+        self.updatesSearchPredicate = self.updatesDataSource.fetchedResultsController.fetchRequest.predicate
+        self.activeAppsSearchPredicate = self.activeAppsDataSource.fetchedResultsController.fetchRequest.predicate
+        self.inactiveAppsSearchPredicate = self.inactiveAppsDataSource.fetchedResultsController.fetchRequest.predicate
         
         self.collectionView.dataSource = self.dataSource
         self.collectionView.prefetchDataSource = self.dataSource
@@ -113,7 +142,7 @@ class MyAppsViewController: UICollectionViewController
         #if !os(tvOS)
         self.collectionView.dragDelegate = self
         self.collectionView.dropDelegate = self
-        self.collectionView.dragInteractionEnabled = false
+        self.collectionView.dragInteractionEnabled = true
         #endif
                 
         self.prototypeUpdateCell = UpdateCollectionViewCell.instantiate(with: UpdateCollectionViewCell.nib)
@@ -1945,18 +1974,179 @@ extension MyAppsViewController
 {
     @objc private func toggleAppLayout()
     {
-        isGridLayout.toggle()
-        UserDefaults.standard.set(isGridLayout, forKey: "SideStoreAppGridLayout")
-        appLayoutButton?.image = UIImage(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
-        appLayoutButton?.accessibilityLabel = NSLocalizedString(
-            isGridLayout ? "Show apps as a list" : "Show apps as a grid",
-            comment: ""
-        )
+        setAppLayout(!isGridLayout)
+    }
 
+    private func setAppLayout(_ isGrid: Bool)
+    {
+        guard self.isGridLayout != isGrid else { return }
+        self.isGridLayout = isGrid
+        UserDefaults.standard.set(isGrid, forKey: "SideStoreAppGridLayout")
         cachedUpdateSizes.removeAll()
         collectionView.collectionViewLayout.invalidateLayout()
         let appSections = IndexSet([Section.activeApps.rawValue, Section.inactiveApps.rawValue])
         collectionView.reloadSections(appSections)
+        configureNavigationMenu()
+    }
+
+    private func configureNavigationMenu()
+    {
+        let gridAction = UIAction(
+            title: NSLocalizedString("Grid", comment: ""),
+            image: UIImage(systemName: "square.grid.2x2"),
+            state: isGridLayout ? .on : .off
+        ) { [weak self] _ in
+            self?.setAppLayout(true)
+        }
+        let listAction = UIAction(
+            title: NSLocalizedString("List", comment: ""),
+            image: UIImage(systemName: "list.bullet"),
+            state: isGridLayout ? .off : .on
+        ) { [weak self] _ in
+            self?.setAppLayout(false)
+        }
+        let viewMenu = UIMenu(
+            title: NSLocalizedString("View", comment: ""),
+            image: UIImage(systemName: "rectangle.grid.2x2"),
+            options: .singleSelection,
+            children: [gridAction, listAction]
+        )
+
+        let currentAppearance = SideStoreAppearance.current
+        let appearanceActions = SideStoreAppearance.allCases.map { appearance in
+            UIAction(
+                title: appearance.localizedName,
+                state: currentAppearance == appearance ? .on : .off
+            ) { [weak self] _ in
+                appearance.apply()
+                self?.configureNavigationMenu()
+            }
+        }
+        let appearanceMenu = UIMenu(
+            title: NSLocalizedString("Appearance", comment: ""),
+            image: UIImage(systemName: "circle.lefthalf.filled"),
+            options: .singleSelection,
+            children: appearanceActions
+        )
+
+        let refreshAction = UIAction(
+            title: NSLocalizedString("Refresh All", comment: ""),
+            image: UIImage(systemName: "arrow.clockwise")
+        ) { [weak self] _ in
+            self?.enableLocalDevVPNAndRefreshAllApps()
+        }
+        let liveContainerAction = UIAction(
+            title: NSLocalizedString("Open LiveContainer", comment: ""),
+            image: UIImage(systemName: "power")
+        ) { [weak self] _ in
+            self?.openLiveContainer()
+        }
+
+        menuBarButtonItem?.menu = UIMenu(
+            title: "",
+            children: [viewMenu, refreshAction, appearanceMenu, liveContainerAction]
+        )
+    }
+
+    @MainActor
+    private func enableLocalDevVPNAndRefreshAllApps()
+    {
+        guard
+            let queryURL = URL(string: "localdevvpn://"),
+            let enableURL = URL(string: "localdevvpn://enable?scheme=sidestore")
+        else {
+            refreshAllApps(UIBarButtonItem())
+            return
+        }
+
+        guard UIApplication.shared.canOpenURL(queryURL) else {
+            let alert = UIAlertController(
+                title: NSLocalizedString("LocalDevVPN Not Available", comment: ""),
+                message: NSLocalizedString("LocalDevVPN isn't installed. You can still refresh your apps without enabling it.", comment: ""),
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: NSLocalizedString("Cancel", comment: ""), style: .cancel))
+            alert.addAction(UIAlertAction(title: NSLocalizedString("Refresh Anyway", comment: ""), style: .default) { [weak self] _ in
+                self?.refreshAllApps(UIBarButtonItem())
+            })
+            present(alert, animated: true)
+            return
+        }
+
+        UIApplication.shared.open(enableURL) { [weak self] success in
+            Task { @MainActor in
+                guard let self = self else { return }
+                guard success else {
+                    let alert = UIAlertController(
+                        title: NSLocalizedString("Unable to Start LocalDevVPN", comment: ""),
+                        message: NSLocalizedString("SideStore couldn't open LocalDevVPN. You can retry or refresh without it.", comment: ""),
+                        preferredStyle: .alert
+                    )
+                    alert.addAction(UIAlertAction(title: NSLocalizedString("Cancel", comment: ""), style: .cancel))
+                    alert.addAction(UIAlertAction(title: NSLocalizedString("Refresh Anyway", comment: ""), style: .default) { [weak self] _ in
+                        self?.refreshAllApps(UIBarButtonItem())
+                    })
+                    self.present(alert, animated: true)
+                    return
+                }
+
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                self.refreshAllApps(UIBarButtonItem())
+            }
+        }
+    }
+
+    @MainActor
+    private func openLiveContainer()
+    {
+        guard
+            let url = URL(string: "livecontainer://"),
+            UIApplication.shared.canOpenURL(url)
+        else {
+            let alert = UIAlertController(
+                title: NSLocalizedString("LiveContainer Not Available", comment: ""),
+                message: NSLocalizedString("LiveContainer couldn't be found on this device.", comment: ""),
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: NSLocalizedString("OK", comment: ""), style: .default))
+            present(alert, animated: true)
+            return
+        }
+
+        UIApplication.shared.open(url)
+    }
+
+    private func applySearchFilter(_ searchText: String)
+    {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let searchPredicate: NSPredicate? = query.isEmpty ? nil : NSPredicate(
+            format: "%K CONTAINS[cd] %@ OR %K CONTAINS[cd] %@ OR %K CONTAINS[cd] %@",
+            #keyPath(InstalledApp.name), query,
+            #keyPath(InstalledApp.bundleIdentifier), query,
+            #keyPath(InstalledApp.resignedBundleIdentifier), query
+        )
+
+        func combined(_ base: NSPredicate?, with search: NSPredicate?) -> NSPredicate?
+        {
+            guard let search = search else { return base }
+            guard let base = base else { return search }
+            return NSCompoundPredicate(andPredicateWithSubpredicates: [base, search])
+        }
+
+        let controllers = [
+            (updatesDataSource.fetchedResultsController, updatesSearchPredicate),
+            (activeAppsDataSource.fetchedResultsController, activeAppsSearchPredicate),
+            (inactiveAppsDataSource.fetchedResultsController, inactiveAppsSearchPredicate)
+        ]
+        for (controller, basePredicate) in controllers {
+            controller.fetchRequest.predicate = combined(basePredicate, with: searchPredicate)
+            do {
+                try controller.performFetch()
+            } catch {
+                debugLog("[MyAppsViewController] Failed to apply app search filter: \(error)")
+            }
+        }
+        collectionView.reloadData()
     }
 
     override func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView
@@ -2546,12 +2736,28 @@ extension MyAppsViewController: UICollectionViewDelegateFlowLayout
     }
 }
 
+extension MyAppsViewController: UISearchResultsUpdating
+{
+    func updateSearchResults(for searchController: UISearchController)
+    {
+        applySearchFilter(searchController.searchBar.text ?? "")
+    }
+}
+
 #if !os(tvOS)
 extension MyAppsViewController: UICollectionViewDragDelegate
 {
     func collectionView(_ collectionView: UICollectionView, itemsForBeginning session: UIDragSession, at indexPath: IndexPath) -> [UIDragItem]
     {
-        return []
+        guard
+            indexPath.section == Section.activeApps.rawValue || indexPath.section == Section.inactiveApps.rawValue
+        else { return [] }
+
+        let installedApp = self.dataSource.item(at: indexPath)
+        let provider = NSItemProvider(object: installedApp.name as NSString)
+        let dragItem = UIDragItem(itemProvider: provider)
+        dragItem.localObject = installedApp
+        return [dragItem]
     }
     
     func collectionView(_ collectionView: UICollectionView, dragPreviewParametersForItemAt indexPath: IndexPath) -> UIDragPreviewParameters?
