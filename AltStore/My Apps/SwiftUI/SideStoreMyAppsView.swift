@@ -113,7 +113,11 @@ struct SideStoreMyAppsView: View {
         ) { result in
             switch result {
             case .success(let urls):
-                guard let url = urls.first, let presenter else { return }
+                guard let url = urls.first else { return }
+                guard let presenter else {
+                    presentErrorMessage("The install interface is not ready yet.")
+                    return
+                }
                 let accessGranted = url.startAccessingSecurityScopedResource()
                 InstallAppDialog.present(ipaURL: url, from: presenter) {
                     self.install(from: url, securityScopeAlreadyStarted: accessGranted)
@@ -309,7 +313,7 @@ struct SideStoreMyAppsView: View {
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .disabled(isManaging(app))
+                .disabled(isManaging(app) || isPledgeInactive(app))
 
                 if app.hasUpdate {
                     Button {
@@ -317,7 +321,7 @@ struct SideStoreMyAppsView: View {
                     } label: {
                         Label("Update", systemImage: "arrow.down.circle")
                     }
-                    .disabled(isManaging(app))
+                    .disabled(isManaging(app) || isPledgeInactive(app))
                 }
 
                 Button {
@@ -333,7 +337,7 @@ struct SideStoreMyAppsView: View {
                     } label: {
                         Label("Delete App", systemImage: "trash")
                     }
-                    .disabled(isManaging(app))
+                    .disabled(isManaging(app) || isPledgeInactive(app))
                 }
 
                 Button {
@@ -341,14 +345,14 @@ struct SideStoreMyAppsView: View {
                 } label: {
                     Label("Enable JIT", systemImage: "bolt")
                 }
-                .disabled(isManaging(app))
+                .disabled(isManaging(app) || isPledgeInactive(app))
             } else {
                 Button {
                     activate(app)
                 } label: {
                     Label("Activate", systemImage: "checkmark.circle")
                 }
-                .disabled(isManaging(app))
+                .disabled(isManaging(app) || isPledgeInactive(app))
 
                 if shouldOfferRemoveForInactiveApp(app) {
                     Button(role: .destructive) {
@@ -418,6 +422,11 @@ struct SideStoreMyAppsView: View {
 
     private func isManaging(_ app: InstalledApp) -> Bool {
         appManager.isActivelyManagingApp(withBundleID: app.bundleIdentifier)
+    }
+
+    private func isPledgeInactive(_ app: InstalledApp) -> Bool {
+        guard let storeApp = app.storeApp else { return false }
+        return storeApp.isPledgeRequired && !storeApp.isPledged
     }
 
     private func select(_ app: InstalledApp) {
@@ -493,21 +502,30 @@ struct SideStoreMyAppsView: View {
         guard let presenter else { return }
         let apps = InstalledApp.fetchAppsForRefreshingAll(in: DatabaseManager.shared.viewContext)
         guard !apps.isEmpty else {
-            presentErrorMessage("There are no apps available to refresh.")
+            let error: Error
+            if let sideStoreApp = InstalledApp.fetchAltStore(in: DatabaseManager.shared.viewContext),
+               let storeApp = sideStoreApp.storeApp,
+               storeApp.isPledgeRequired && !storeApp.isPledged {
+                error = OperationError.pledgeInactive(appName: sideStoreApp.name)
+            } else {
+                error = OperationError.noInstalledApps
+            }
+            presentError(error)
             return
         }
 
         let group = operations.refresh(apps, presentingViewController: presenter)
         group.completionHandler = { results in
-            let failure = results.values.compactMap { result -> Error? in
+            let failures = results.compactMapValues { result -> Error? in
                 if case .failure(let error) = result, !(error is CancellationError) {
                     return error
                 }
                 return nil
-            }.first
+            }
             DispatchQueue.main.async {
-                if let failure {
-                    self.presentError(failure)
+                if !failures.isEmpty {
+                    let detail = failures.values.first?.localizedDescription ?? "Unknown error"
+                    self.presentErrorMessage("Failed to refresh \\(failures.count) app(s). \\(detail)")
                 }
                 self.model.reload()
             }
@@ -559,13 +577,24 @@ struct SideStoreMyAppsView: View {
             return
         }
 
+        // Match the legacy prompt: mark the candidate inactive before asking
+        // AppManager to deactivate it, so the next active-slot calculation sees
+        // the pending state. Restore it if the operation fails.
+        candidate.isActive = false
         operations.deactivate(candidate, presentingViewController: presenter) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success:
+                    if let context = candidate.managedObjectContext, context.hasChanges {
+                        try? context.save()
+                    }
                     self.model.reload()
                     self.continueActivationIfNeeded()
                 case .failure(let error):
+                    candidate.managedObjectContext?.perform {
+                        candidate.isActive = true
+                        try? candidate.managedObjectContext?.save()
+                    }
                     self.pendingActivationApp = nil
                     self.activationCandidates = []
                     if !(error is CancellationError) {
@@ -714,7 +743,7 @@ struct SideStoreMyAppsView: View {
         switch confirmation {
         case .deactivate(let app): return "Deactivate \(app.name)?"
         case .remove(let app): return "Remove \(app.name) from SideStore?"
-        case .delete(let app): return "Delete \(app.name) from your device?"
+        case .delete(let app): return "Delete “\\(app.name)”?"
         case .backup(let app): return "Back Up \(app.name)?"
         case .restore(let app): return "Restore \(app.name)?"
         case nil: return "Confirm Action"
@@ -726,7 +755,9 @@ struct SideStoreMyAppsView: View {
         case .deactivate:
             return "The app will remain installed but will no longer be active in SideStore."
         case .remove:
-            return "The app record will be removed from SideStore. This does not uninstall the app from your device."
+            return UserDefaults.standard.isLegacyDeactivationSupported
+                ? "You must also delete the app from the Home Screen to fully uninstall it."
+                : "This will remove the app from SideStore and erase any backup data for this app."
         case .delete:
             return "This will remove the app from SideStore and erase its backup. Choose Remove to keep the app on your device, or Delete to uninstall it."
         case .backup:
