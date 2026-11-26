@@ -8,6 +8,50 @@
 
 @preconcurrency import UIKit
 
+enum SideStoreAppearance: String, CaseIterable
+{
+    case system
+    case light
+    case dark
+
+    static let defaultsKey = "SideStoreAppearance"
+
+    static var current: SideStoreAppearance {
+        SideStoreAppearance(rawValue: UserDefaults.standard.string(forKey: defaultsKey) ?? "") ?? .system
+    }
+
+    var localizedName: String {
+        switch self {
+        case .system: return NSLocalizedString("System", comment: "")
+        case .light: return NSLocalizedString("Light", comment: "")
+        case .dark: return NSLocalizedString("Dark", comment: "")
+        }
+    }
+
+    var interfaceStyle: UIUserInterfaceStyle {
+        switch self {
+        case .system: return .unspecified
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
+    func apply()
+    {
+        UserDefaults.standard.set(rawValue, forKey: Self.defaultsKey)
+        for windowScene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+            for window in windowScene.windows {
+                window.overrideUserInterfaceStyle = interfaceStyle
+            }
+        }
+    }
+
+    static func applyStoredPreference(to window: UIWindow?)
+    {
+        window?.overrideUserInterfaceStyle = current.interfaceStyle
+    }
+}
+
 extension TabBarController
 {
     private enum Tab: Int, CaseIterable
@@ -38,8 +82,26 @@ final class TabBarController: UITabBarController
         
         let appsTab = self.viewControllers?[Tab.myApps.rawValue].tabBarItem
         appsTab?.title = NSLocalizedString("Apps", comment: "")
-        appsTab?.image = UIImage(systemName: "square.stack.3d.up.fill")
+        appsTab?.image = UIImage(systemName: "square.grid.2x2.fill")
         self.viewControllers?[Tab.settings.rawValue].tabBarItem.image = UIImage(systemName: "gearshape.fill")
+
+        view.tintColor = .systemBlue
+        tabBar.tintColor = .systemBlue
+        SideStoreAppearance.applyStoredPreference(to: view.window)
+
+        #if !os(tvOS)
+        if #available(iOS 26.0, *) {
+            // Keep the system tab bar so iOS can render its native Liquid Glass navigation layer.
+            tabBar.isTranslucent = true
+            tabBar.backgroundImage = nil
+            tabBar.shadowImage = nil
+        } else {
+            let appearance = UITabBarAppearance()
+            appearance.configureWithDefaultBackground()
+            tabBar.standardAppearance = appearance
+            tabBar.scrollEdgeAppearance = appearance
+        }
+        #endif
     }
     
     override func viewDidAppear(_ animated: Bool)
