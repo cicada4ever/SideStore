@@ -63,9 +63,16 @@ struct InstalledAppsOperations {
     ) {
         AppManager.shared.activate(
             app,
-            presentingViewController: presentingViewController,
-            completionHandler: completionHandler
-        )
+            presentingViewController: presentingViewController
+        ) { result in
+            if case .success(let activatedApp) = result {
+                activatedApp.managedObjectContext?.perform {
+                    activatedApp.isActive = true
+                    try? activatedApp.managedObjectContext?.save()
+                }
+            }
+            completionHandler(result)
+        }
     }
 
     func deactivate(
@@ -75,9 +82,15 @@ struct InstalledAppsOperations {
     ) {
         AppManager.shared.deactivate(
             app,
-            presentingViewController: presentingViewController,
-            completionHandler: completionHandler
-        )
+            presentingViewController: presentingViewController
+        ) { result in
+            if case .success(let deactivatedApp) = result {
+                deactivatedApp.managedObjectContext?.perform {
+                    try? deactivatedApp.managedObjectContext?.save()
+                }
+            }
+            completionHandler(result)
+        }
     }
 
     func deleteFromDevice(
@@ -87,9 +100,15 @@ struct InstalledAppsOperations {
     ) {
         AppManager.shared.deleteApp(
             app,
-            presentingViewController: presentingViewController,
-            completionHandler: completionHandler
-        )
+            presentingViewController: presentingViewController
+        ) { result in
+            if case .success(let deletedApp) = result {
+                deletedApp.managedObjectContext?.perform {
+                    try? deletedApp.managedObjectContext?.save()
+                }
+            }
+            completionHandler(result)
+        }
     }
 
     func backup(
