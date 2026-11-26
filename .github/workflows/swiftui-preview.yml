@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: sidestore-swiftui-preview-${{ github.ref }}
@@ -79,3 +79,21 @@ jobs:
           name: SideStore-SwiftUI-Preview-Logs-${{ env.SHORT_COMMIT }}.zip
           path: build-logs.zip
           if-no-files-found: error
+
+      - name: Publish versioned SideStore integration preview (never nightly)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="swiftui-preview-${SHORT_COMMIT}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "SideStore-${MARKETING_VERSION}.ipa#SideStore.ipa" --clobber
+          else
+            gh release create "$TAG" "SideStore-${MARKETING_VERSION}.ipa#SideStore.ipa" \
+              --target "$GITHUB_SHA" \
+              --title "SideStore SwiftUI Preview ${SHORT_COMMIT}" \
+              --notes "Non-production integration preview built from commit $GITHUB_SHA on branch feature/swiftui-rewrite. This release is separate from nightly." \
+              --prerelease
+          fi
+          echo "Created or updated preview release: $TAG"
+          echo "SideStore preview asset: https://github.com/cicada4ever/SideStore/releases/download/$TAG/SideStore.ipa"
