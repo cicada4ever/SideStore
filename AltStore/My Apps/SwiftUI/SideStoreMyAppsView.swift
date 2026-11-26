@@ -33,7 +33,7 @@ struct SideStoreMyAppsView: View {
     }
 
     var body: some View {
-        Group {
+        SwiftUI.Group {
             if model.isGridLayout {
                 gridContent
             } else {
@@ -52,16 +52,16 @@ struct SideStoreMyAppsView: View {
                     }
 
                     Picker("Layout", selection: $model.isGridLayout) {
-                        Label("List", systemImage: "list.bullet").tag(false)
-                        Label("Grid", systemImage: "square.grid.2x2").tag(true)
+                        SwiftUI.Label("List", systemImage: "list.bullet").tag(false)
+                        SwiftUI.Label("Grid", systemImage: "square.grid.2x2").tag(true)
                     }
 
                     Divider()
 
-                    Button {
+                    SwiftUI.Button {
                         refreshAll()
                     } label: {
-                        Label("Refresh All", systemImage: "arrow.clockwise")
+                        SwiftUI.Label("Refresh All", systemImage: "arrow.clockwise")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -90,11 +90,11 @@ struct SideStoreMyAppsView: View {
             titleVisibility: .visible
         ) {
             ForEach(activationCandidates, id: \.objectID) { candidate in
-                Button(action: { deactivateForActivationLimit(candidate) }) {
+                SwiftUI.Button(action: { deactivateForActivationLimit(candidate) }) {
                     Text(candidate.name)
                 }
             }
-            Button("Cancel", role: .cancel) {
+            SwiftUI.Button("Cancel", role: .cancel) {
                 pendingActivationApp = nil
                 activationCandidates = []
             }
@@ -129,7 +129,7 @@ struct SideStoreMyAppsView: View {
             }
         }
         .alert("Something Went Wrong", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
+            SwiftUI.Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage)
         }
@@ -237,10 +237,10 @@ struct SideStoreMyAppsView: View {
     }
 
     private func appCell(_ app: InstalledApp, isGrid: Bool) -> some View {
-        Button {
+        SwiftUI.Button {
             select(app)
         } label: {
-            Group {
+            SwiftUI.Group {
                 if isGrid {
                     VStack(spacing: 7) {
                         appIcon(app, size: 62)
@@ -308,56 +308,56 @@ struct SideStoreMyAppsView: View {
     @ViewBuilder
     private func appContextMenu(_ app: InstalledApp) -> some View {
         if app.isActive {
-            Button(action: { refresh(app) }) {
-                Label("Refresh", systemImage: "arrow.clockwise")
+            SwiftUI.Button(action: { refresh(app) }) {
+                SwiftUI.Label("Refresh", systemImage: "arrow.clockwise")
             }
             .disabled(isManaging(app) || isPledgeInactive(app))
 
             if app.hasUpdate {
-                Button(action: { update(app) }) {
-                    Label("Update", systemImage: "arrow.down.circle")
+                SwiftUI.Button(action: { update(app) }) {
+                    SwiftUI.Label("Update", systemImage: "arrow.down.circle")
                 }
                 .disabled(isManaging(app) || isPledgeInactive(app))
             }
 
-            Button(action: { confirmation = .deactivate(app) }) {
-                Label("Deactivate", systemImage: "pause.circle")
+            SwiftUI.Button(action: { confirmation = .deactivate(app) }) {
+                SwiftUI.Label("Deactivate", systemImage: "pause.circle")
             }
             .disabled(isManaging(app))
 
             if app.bundleIdentifier != Bundle.Info.appbundleIdentifier {
-                Button(action: { confirmation = .delete(app) }) {
-                    Label("Delete App", systemImage: "trash")
+                SwiftUI.Button(action: { confirmation = .delete(app) }) {
+                    SwiftUI.Label("Delete App", systemImage: "trash")
                 }
                 .disabled(isManaging(app) || isPledgeInactive(app))
             }
 
-            Button(action: { enableJIT(app) }) {
-                Label("Enable JIT", systemImage: "bolt")
+            SwiftUI.Button(action: { enableJIT(app) }) {
+                SwiftUI.Label("Enable JIT", systemImage: "bolt")
             }
             .disabled(isManaging(app) || isPledgeInactive(app))
         } else {
-            Button(action: { activate(app) }) {
-                Label("Activate", systemImage: "checkmark.circle")
+            SwiftUI.Button(action: { activate(app) }) {
+                SwiftUI.Label("Activate", systemImage: "checkmark.circle")
             }
             .disabled(isManaging(app) || isPledgeInactive(app))
 
             if shouldOfferRemoveForInactiveApp(app) {
-                Button(action: { confirmation = .remove(app) }) {
-                    Label("Remove", systemImage: "minus.circle")
+                SwiftUI.Button(action: { confirmation = .remove(app) }) {
+                    SwiftUI.Label("Remove", systemImage: "minus.circle")
                 }
                 .disabled(isManaging(app))
             }
         }
 
         if app.isActive || (!UserDefaults.standard.isLegacyDeactivationSupported && UTType(app.installedAppUTI) != nil) {
-            Button(action: { backup(app) }) {
-                Label("Create Backup", systemImage: "archivebox")
+            SwiftUI.Button(action: { backup(app) }) {
+                SwiftUI.Label("Create Backup", systemImage: "archivebox")
             }
             .disabled(isManaging(app))
 
-            Button(action: { confirmation = .restore(app) }) {
-                Label("Restore Backup", systemImage: "arrow.uturn.backward")
+            SwiftUI.Button(action: { confirmation = .restore(app) }) {
+                SwiftUI.Label("Restore Backup", systemImage: "arrow.uturn.backward")
             }
             .disabled(isManaging(app))
         }
@@ -387,7 +387,7 @@ struct SideStoreMyAppsView: View {
         color: Color,
         compact: Bool
     ) -> some View {
-        Label(title, systemImage: symbol)
+        SwiftUI.Label(title, systemImage: symbol)
             .font(compact ? .caption2 : .caption)
             .foregroundStyle(color)
             .lineLimit(1)
@@ -759,30 +759,30 @@ struct SideStoreMyAppsView: View {
     private var confirmationButtons: some View {
         switch confirmation {
         case .deactivate(let app):
-            Button(action: { deactivate(app) }) {
+            SwiftUI.Button(action: { deactivate(app) }) {
                 Text("Deactivate")
             }
             .tint(.red)
         case .remove(let app):
-            Button(action: { removeFromSideStore(app) }) {
+            SwiftUI.Button(action: { removeFromSideStore(app) }) {
                 Text("Remove from SideStore")
             }
             .tint(.red)
         case .delete(let app):
-            Button(action: { removeFromSideStore(app) }) {
+            SwiftUI.Button(action: { removeFromSideStore(app) }) {
                 Text("Remove")
             }
             .tint(.red)
-            Button(action: { deleteFromDevice(app) }) {
+            SwiftUI.Button(action: { deleteFromDevice(app) }) {
                 Text("Delete")
             }
             .tint(.red)
         case .backup(let app):
-            Button(action: { backup(app) }) {
+            SwiftUI.Button(action: { backup(app) }) {
                 Text("Back Up")
             }
         case .restore(let app):
-            Button(action: { restore(app) }) {
+            SwiftUI.Button(action: { restore(app) }) {
                 Text("Restore")
             }
             .tint(.red)
@@ -790,7 +790,7 @@ struct SideStoreMyAppsView: View {
             EmptyView()
         }
 
-        Button(action: { confirmation = nil }) {
+        SwiftUI.Button(action: { confirmation = nil }) {
             Text("Cancel")
         }
     }
@@ -810,7 +810,7 @@ private struct InstalledAppIconView: View {
     @State private var icon: UIImage?
 
     var body: some View {
-        Group {
+        SwiftUI.Group {
             if let icon {
                 Image(uiImage: icon)
                     .resizable()
