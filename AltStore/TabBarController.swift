@@ -74,6 +74,12 @@ final class TabBarController: UITabBarController, UITabBarControllerDelegate
         self.updateInstallButtonVisibility()
     }
     
+    override func viewDidLayoutSubviews()
+    {
+        super.viewDidLayoutSubviews()
+        self.updateInstallButtonVisibility()
+    }
+
     override func viewDidAppear(_ animated: Bool)
     {
         super.viewDidAppear(animated)
@@ -91,7 +97,19 @@ final class TabBarController: UITabBarController, UITabBarControllerDelegate
     
     private func updateInstallButtonVisibility()
     {
-        self.installAppButton?.isHidden = self.selectedIndex != Tab.myApps.rawValue
+        let isMyAppsRootVisible: Bool
+        if
+            self.selectedIndex == Tab.myApps.rawValue,
+            let navigationController = self.viewControllers?[Tab.myApps.rawValue] as? UINavigationController
+        {
+            isMyAppsRootVisible = navigationController.visibleViewController is MyAppsViewController
+        }
+        else
+        {
+            isMyAppsRootVisible = false
+        }
+
+        self.installAppButton?.isHidden = !isMyAppsRootVisible
     }
 
     private func updateInstallButtonAppearance()
