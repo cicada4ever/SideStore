@@ -62,13 +62,16 @@ private final class InstallSourceSheetViewController: UIViewController
         titleLabel.textColor = .label
         titleLabel.textAlignment = .center
 
+        let chooseFiles = onChooseFiles
+        let chooseURL = onChooseURL
+
         let filesButton = makeButton(
             title: NSLocalizedString("From Files", comment: ""),
             symbol: "folder",
             primary: true
         )
         filesButton.addAction(UIAction { [weak self] _ in
-            self?.dismiss(animated: true) { self?.onChooseFiles() }
+            self?.dismiss(animated: true, completion: chooseFiles)
         }, for: .primaryActionTriggered)
 
         let urlButton = makeButton(
@@ -77,7 +80,7 @@ private final class InstallSourceSheetViewController: UIViewController
             primary: false
         )
         urlButton.addAction(UIAction { [weak self] _ in
-            self?.dismiss(animated: true) { self?.onChooseURL() }
+            self?.dismiss(animated: true, completion: chooseURL)
         }, for: .primaryActionTriggered)
 
         let stack = UIStackView(arrangedSubviews: [titleLabel, filesButton, urlButton])
@@ -98,7 +101,12 @@ private final class InstallSourceSheetViewController: UIViewController
 
     private func makeButton(title: String, symbol: String, primary: Bool) -> UIButton
     {
-        var configuration = primary ? UIButton.Configuration.filled() : UIButton.Configuration.gray()
+        var configuration: UIButton.Configuration
+        if #available(iOS 26.0, *) {
+            configuration = primary ? .prominentGlass() : .glass()
+        } else {
+            configuration = primary ? .filled() : .gray()
+        }
         configuration.title = title
         configuration.image = UIImage(systemName: symbol)
         configuration.imagePadding = 10
@@ -114,7 +122,9 @@ private final class InstallSourceSheetViewController: UIViewController
         }
 
         let button = UIButton(configuration: configuration)
+        button.tintColor = primary ? .systemBlue : .secondaryLabel
         button.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        button.titleLabel?.adjustsFontForContentSizeCategory = true
         button.accessibilityLabel = title
         return button
     }
