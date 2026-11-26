@@ -17,9 +17,10 @@ extension TabBarController
     }
 }
 
-final class TabBarController: UITabBarController
+final class TabBarController: UITabBarController, UITabBarControllerDelegate
 {
     private var initialSegue: (identifier: String, sender: Any?)?
+    private var installAppButton: UIButton?
     
     private var _viewDidAppear = false
     
@@ -40,12 +41,44 @@ final class TabBarController: UITabBarController
         appsTab?.title = NSLocalizedString("Apps", comment: "")
         appsTab?.image = UIImage(systemName: "square.stack.3d.up.fill")
         self.viewControllers?[Tab.settings.rawValue].tabBarItem.image = UIImage(systemName: "gearshape.fill")
+
+        self.delegate = self
+        self.tabBar.itemPositioning = .centered
+        self.tabBar.itemWidth = 78
+        self.tabBar.itemSpacing = 12
+
+        let installButton = UIButton(type: .system)
+        var configuration = UIButton.Configuration.bordered()
+        configuration.image = UIImage(systemName: "plus")
+        configuration.imagePadding = 0
+        configuration.baseForegroundColor = .label
+        configuration.baseBackgroundColor = .secondarySystemBackground
+        configuration.cornerStyle = .capsule
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        installButton.configuration = configuration
+        installButton.translatesAutoresizingMaskIntoConstraints = false
+        installButton.accessibilityLabel = NSLocalizedString("Install App", comment: "")
+        installButton.accessibilityHint = NSLocalizedString("Choose an app file or install from a URL.", comment: "")
+        installButton.layer.borderWidth = 0.5
+        installButton.layer.borderColor = UIColor.separator.cgColor
+        installButton.addTarget(self, action: #selector(installAppTapped), for: .primaryActionTriggered)
+
+        self.tabBar.addSubview(installButton)
+        NSLayoutConstraint.activate([
+            installButton.trailingAnchor.constraint(equalTo: self.tabBar.trailingAnchor, constant: -12),
+            installButton.centerYAnchor.constraint(equalTo: self.tabBar.centerYAnchor),
+            installButton.widthAnchor.constraint(equalToConstant: 54),
+            installButton.heightAnchor.constraint(equalToConstant: 54)
+        ])
+        self.installAppButton = installButton
+        self.updateInstallButtonVisibility()
     }
     
     override func viewDidAppear(_ animated: Bool)
     {
         super.viewDidAppear(animated)
         debugLog("[TabBarController] viewDidAppear() — TabBarController is now visible")
+        self.updateInstallButtonVisibility()
         
         _viewDidAppear = true
         
@@ -56,6 +89,26 @@ final class TabBarController: UITabBarController
         }
     }
     
+    private func updateInstallButtonVisibility()
+    {
+        self.installAppButton?.isHidden = self.selectedIndex != Tab.myApps.rawValue
+    }
+
+    @objc private func installAppTapped()
+    {
+        guard
+            let navigationController = self.viewControllers?[Tab.myApps.rawValue] as? UINavigationController,
+            let myAppsViewController = navigationController.viewControllers.first as? MyAppsViewController
+        else { return }
+
+        myAppsViewController.presentInstallAppMenu()
+    }
+
+    func tabBarController(_ tabBarController: UITabBarController, didSelect viewController: UIViewController)
+    {
+        self.updateInstallButtonVisibility()
+    }
+
     override func performSegue(withIdentifier identifier: String, sender: Any?)
     {
         guard _viewDidAppear else {

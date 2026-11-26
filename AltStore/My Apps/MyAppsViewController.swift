@@ -20,6 +20,27 @@ import Nuke
 
 private let maximumCollapsedUpdatesCount = 2
 
+private enum InstalledAppsSortOption: String, CaseIterable
+{
+    case expiration
+    case newest
+    case oldest
+    case recentlyRefreshed
+    case name
+
+    var title: String
+    {
+        switch self
+        {
+        case .expiration: return NSLocalizedString("Expiration Soonest", comment: "")
+        case .newest: return NSLocalizedString("Newest", comment: "")
+        case .oldest: return NSLocalizedString("Oldest", comment: "")
+        case .recentlyRefreshed: return NSLocalizedString("Recently Refreshed", comment: "")
+        case .name: return NSLocalizedString("Name", comment: "")
+        }
+    }
+}
+
 extension MyAppsViewController
 {
     private enum Section: Int, CaseIterable
@@ -33,7 +54,7 @@ extension MyAppsViewController
 
 // @livecontainer
 @objc(MyAppsViewController)
-class MyAppsViewController: UICollectionViewController
+class MyAppsViewController: UICollectionViewController, UISearchResultsUpdating
 {
     private let coordinator = NSFileCoordinator()
     private let operationQueue = OperationQueue()
@@ -58,20 +79,30 @@ class MyAppsViewController: UICollectionViewController
     private var isCheckingForUpdates = false
     private var didChangeActiveApps = false
     private var previousInactiveAppsCount = 0
-    private var statusDotView: UIView?
     
     private var _imagePickerInstalledApp: InstalledApp?
     private var _viewDidAppear = false
     private var pendingImportURL: URL?
-    
-    private var minimuxerStatusCheckTask: Task<Void, Never>?
-    
+
+    private let appSearchController = UISearchController(searchResultsController: nil)
+    private var activeAppsBasePredicate: NSPredicate?
+    private var inactiveAppsBasePredicate: NSPredicate?
+
     // Cache
     private var cachedUpdateSizes = [String: CGSize]()
-    
+
     private var activeTeam: ALTTeam?
     private var isGridLayout = UserDefaults.standard.bool(forKey: "SideStoreAppGridLayout")
-    private var appLayoutButton: UIBarButtonItem?
+
+    private var searchText: String {
+        appSearchController.searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    private var selectedSortOption: InstalledAppsSortOption {
+        InstalledAppsSortOption(
+            rawValue: UserDefaults.standard.string(forKey: "SideStoreInstalledAppsSortOption") ?? ""
+        ) ?? .expiration
+    }
     
     required init?(coder aDecoder: NSCoder)
     {
@@ -82,25 +113,35 @@ class MyAppsViewController: UICollectionViewController
         NotificationCenter.default.addObserver(self, selector: #selector(MyAppsViewController.appIDsViewControllerDidDismiss(_:)), name: AppIDsViewController.didDismissNotification, object: nil)
     }
     
-    deinit {
-        if !(minimuxerStatusCheckTask?.isCancelled == true) {
-            minimuxerStatusCheckTask?.cancel()
-        }
-    }
-    
     override func viewDidLoad()
     {
         super.viewDidLoad()
 
-        let layoutButton = UIBarButtonItem(
-            image: UIImage(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2"),
+        navigationItem.title = NSLocalizedString("My Apps", comment: "")
+        navigationItem.largeTitleDisplayMode = .always
+        navigationController?.navigationBar.prefersLargeTitles = true
+        navigationItem.leftBarButtonItem = nil
+
+        appSearchController.searchResultsUpdater = self
+        appSearchController.obscuresBackgroundDuringPresentation = false
+        appSearchController.hidesNavigationBarDuringPresentation = false
+        appSearchController.searchBar.placeholder = NSLocalizedString("Search", comment: "")
+        appSearchController.searchBar.autocapitalizationType = .none
+        appSearchController.searchBar.autocorrectionType = .no
+        navigationItem.searchController = appSearchController
+        navigationItem.hidesSearchBarWhenScrolling = false
+        definesPresentationContext = true
+        collectionView.keyboardDismissMode = .onDrag
+
+        let overflowButton = UIBarButtonItem(
+            image: UIImage(systemName: "ellipsis"),
             style: .plain,
-            target: self,
-            action: #selector(toggleAppLayout)
+            target: nil,
+            action: nil
         )
-        layoutButton.accessibilityLabel = NSLocalizedString("Change app layout", comment: "")
-        appLayoutButton = layoutButton
-        navigationItem.rightBarButtonItems = (navigationItem.rightBarButtonItems ?? []) + [layoutButton]
+        overflowButton.accessibilityLabel = NSLocalizedString("More Options", comment: "")
+        overflowButton.menu = makeOverflowMenu()
+        navigationItem.rightBarButtonItem = overflowButton
         
         // Allows us to intercept delegate callbacks.
         self.updatesDataSource.fetchedResultsController.delegate = self
@@ -153,18 +194,6 @@ class MyAppsViewController: UICollectionViewController
         
         NotificationCenter.default.addObserver(self, selector: #selector(MyAppsViewController.didChangeAppIcon(_:)), name: UIApplication.didChangeAppIconNotification, object: nil)
         
-        if minimuxerStatusCheckTask == nil {
-            minimuxerStatusCheckTask = Task {
-                let status = await isMinimuxerReady()
-                updateStatusDot(isReady: status.isSuccess)
-                // Listen to subsequent updates reactively
-                for await result in minimuxerStatusPublisher.values {
-                    guard !Task.isCancelled else { break }
-                    updateStatusDot(isReady: result.isSuccess)
-                }
-            }
-        }
-        
         Task { @MainActor [weak self] in
             self?.activeTeam = try? await AuthManager.shared.getAuthenticatedTeam()
         }
@@ -215,87 +244,6 @@ class MyAppsViewController: UICollectionViewController
         super.viewWillDisappear(animated)
     }
     
-    private func findView(in view: UIView, where predicate: (UIView) -> Bool) -> UIView? {
-        if predicate(view) {
-            return view
-        }
-        for subview in view.subviews {
-            if let found = findView(in: subview, where: predicate) {
-                return found
-            }
-        }
-        return nil
-    }
-
-    private func updateStatusDot(isReady: Bool)
-    {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            guard let navigationBar = self.navigationController?.navigationBar else { return }
-            
-            guard let largeTitleView = self.findView(in: navigationBar, where: { NSStringFromClass(type(of: $0)).contains("LargeTitle") }) else {
-                return
-            }
-            
-            let targetColor: UIColor = isReady ? .systemGreen : .systemRed
-            
-            let updateColorClosure: () -> Void = { [weak self] in
-                guard let self = self, let existingDot = self.statusDotView else { return }
-                
-                if existingDot.backgroundColor != targetColor {
-                    UIView.animate(withDuration: 0.25, delay: 0.0, options: [.beginFromCurrentState, .curveEaseInOut]) {
-                        existingDot.backgroundColor = targetColor
-                        existingDot.transform = CGAffineTransform(scaleX: 1.25, y: 1.25)
-                    } completion: { _ in
-                        UIView.animate(withDuration: 0.15, delay: 0.0, options: .curveEaseInOut) {
-                            existingDot.transform = .identity
-                        }
-                    }
-                }
-            }
-            
-            // If the dot is already created and attached to largeTitleView, just update color O(1)
-            if let existingDot = self.statusDotView, existingDot.superview == largeTitleView {
-                updateColorClosure()
-                return
-            }
-            
-            self.statusDotView?.removeFromSuperview()
-            
-            let titleText = NSLocalizedString("My Apps", comment: "")
-            let font = UIFont.systemFont(ofSize: 34, weight: .bold)
-            let textWidth = titleText.size(withAttributes: [.font: font]).width
-            let leftMargin: CGFloat = 20
-            
-            let dot = UIView()
-            dot.translatesAutoresizingMaskIntoConstraints = false
-            dot.layer.cornerRadius = 3.5
-            dot.transform = CGAffineTransform(scaleX: 0.01, y: 0.01)
-            dot.alpha = 0.0
-            largeTitleView.addSubview(dot)
-            self.statusDotView = dot
-            
-            NSLayoutConstraint.activate([
-                dot.leadingAnchor.constraint(equalTo: largeTitleView.leadingAnchor, constant: leftMargin + textWidth - 2),
-                dot.bottomAnchor.constraint(equalTo: largeTitleView.bottomAnchor, constant: -32),
-                dot.widthAnchor.constraint(equalToConstant: 7),
-                dot.heightAnchor.constraint(equalToConstant: 7)
-            ])
-            
-            let animateEntranceClosure: () -> Void = {
-                dot.backgroundColor = targetColor
-                UIView.animate(withDuration: 0.35, delay: 0.1, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8, options: [], animations: {
-                    dot.transform = .identity
-                    dot.alpha = 1.0
-                }, completion: nil)
-            }
-            
-            animateEntranceClosure()
-            return
-        }
-    }
-    
     override func prepare(for segue: UIStoryboardSegue, sender: Any?)
     {
         guard let identifier = segue.identifier else { return }
@@ -338,6 +286,159 @@ class MyAppsViewController: UICollectionViewController
 
 private extension MyAppsViewController
 {
+    func sortDescriptors(for option: InstalledAppsSortOption) -> [NSSortDescriptor]
+    {
+        let name = NSSortDescriptor(keyPath: \InstalledApp.name, ascending: true)
+
+        switch option
+        {
+        case .expiration:
+            return [
+                NSSortDescriptor(keyPath: \InstalledApp.expirationDate, ascending: true),
+                NSSortDescriptor(keyPath: \InstalledApp.refreshedDate, ascending: false),
+                name
+            ]
+        case .newest:
+            return [
+                NSSortDescriptor(keyPath: \InstalledApp.installedDate, ascending: false),
+                name
+            ]
+        case .oldest:
+            return [
+                NSSortDescriptor(keyPath: \InstalledApp.installedDate, ascending: true),
+                name
+            ]
+        case .recentlyRefreshed:
+            return [
+                NSSortDescriptor(keyPath: \InstalledApp.refreshedDate, ascending: false),
+                name
+            ]
+        case .name:
+            return [name]
+        }
+    }
+
+    func applyMinimalPresentation(to cell: InstalledAppCollectionViewCell)
+    {
+        cell.bannerView.setMinimalInstalledAppPresentation(isGrid: self.isGridLayout)
+        cell.deactivateBadge?.isHidden = true
+    }
+
+    func applyAppSearchAndSorting()
+    {
+        let term = self.searchText
+        let searchPredicate: NSPredicate? = term.isEmpty ? nil : NSPredicate(
+            format: "(%K CONTAINS[cd] %@) OR (%K CONTAINS[cd] %@)",
+            #keyPath(InstalledApp.name), term,
+            #keyPath(InstalledApp.bundleIdentifier), term
+        )
+
+        func predicate(base: NSPredicate?) -> NSPredicate?
+        {
+            guard let searchPredicate else { return base }
+            guard let base else { return searchPredicate }
+            return NSCompoundPredicate(andPredicateWithSubpredicates: [base, searchPredicate])
+        }
+
+        let activeController = self.activeAppsDataSource.fetchedResultsController
+        let inactiveController = self.inactiveAppsDataSource.fetchedResultsController
+
+        activeController.fetchRequest.predicate = predicate(base: self.activeAppsBasePredicate)
+        inactiveController.fetchRequest.predicate = predicate(base: self.inactiveAppsBasePredicate)
+        activeController.fetchRequest.sortDescriptors = self.sortDescriptors(for: self.selectedSortOption)
+        inactiveController.fetchRequest.sortDescriptors = self.sortDescriptors(for: self.selectedSortOption)
+
+        do
+        {
+            try activeController.performFetch()
+            try inactiveController.performFetch()
+        }
+        catch
+        {
+            debugLog("[MyApps] Failed to apply installed-app filters: \(error)")
+        }
+
+        self.cachedUpdateSizes.removeAll()
+        self.collectionView.reloadData()
+    }
+
+    func setSortOption(_ option: InstalledAppsSortOption)
+    {
+        UserDefaults.standard.set(option.rawValue, forKey: "SideStoreInstalledAppsSortOption")
+        self.applyAppSearchAndSorting()
+        self.navigationItem.rightBarButtonItem?.menu = self.makeOverflowMenu()
+    }
+
+    func setGridLayout(_ enabled: Bool)
+    {
+        guard self.isGridLayout != enabled else { return }
+        self.isGridLayout = enabled
+        UserDefaults.standard.set(enabled, forKey: "SideStoreAppGridLayout")
+        self.collectionView.collectionViewLayout.invalidateLayout()
+        self.collectionView.reloadData()
+        self.navigationItem.rightBarButtonItem?.menu = self.makeOverflowMenu()
+    }
+
+    func makeOverflowMenu() -> UIMenu
+    {
+        let refreshAll = UIAction(
+            title: NSLocalizedString("Refresh All", comment: ""),
+            image: UIImage(systemName: "arrow.clockwise")
+        ) { [weak self] _ in
+            self?.refreshAllApps(UIBarButtonItem())
+        }
+
+        let checkForUpdates = UIAction(
+            title: NSLocalizedString("Check for Updates", comment: ""),
+            image: UIImage(systemName: "arrow.triangle.2.circlepath")
+        ) { [weak self] _ in
+            self?.checkForUpdates()
+        }
+
+        let sortActions = InstalledAppsSortOption.allCases.map { option in
+            UIAction(
+                title: option.title,
+                state: self.selectedSortOption == option ? .on : .off
+            ) { [weak self] _ in
+                self?.setSortOption(option)
+            }
+        }
+        let sortMenu = UIMenu(
+            title: NSLocalizedString("Sort By", comment: ""),
+            image: UIImage(systemName: "arrow.up.arrow.down"),
+            children: sortActions
+        )
+
+        let listAction = UIAction(
+            title: NSLocalizedString("List", comment: ""),
+            image: UIImage(systemName: "list.bullet"),
+            state: self.isGridLayout ? .off : .on
+        ) { [weak self] _ in
+            self?.setGridLayout(false)
+        }
+        let gridAction = UIAction(
+            title: NSLocalizedString("Grid", comment: ""),
+            image: UIImage(systemName: "square.grid.2x2"),
+            state: self.isGridLayout ? .on : .off
+        ) { [weak self] _ in
+            self?.setGridLayout(true)
+        }
+        let layoutMenu = UIMenu(
+            title: NSLocalizedString("Layout", comment: ""),
+            image: UIImage(systemName: "rectangle.grid.1x2"),
+            children: [listAction, gridAction]
+        )
+
+        let appIDs = UIAction(
+            title: NSLocalizedString("App IDs", comment: ""),
+            image: UIImage(systemName: "person.text.rectangle")
+        ) { [weak self] _ in
+            self?.performSegue(withIdentifier: "showAppIDs", sender: nil)
+        }
+
+        return UIMenu(title: "", children: [refreshAll, checkForUpdates, sortMenu, layoutMenu, appIDs])
+    }
+
     func makeDataSource() -> CompositeCollectionViewPrefetchingDataSource<InstalledApp, UIImage>
     {
         let dataSource = CompositeCollectionViewPrefetchingDataSource<InstalledApp, UIImage>(dataSources: [self.noUpdatesDataSource, self.updatesDataSource, self.activeAppsDataSource, self.inactiveAppsDataSource])
@@ -474,10 +575,9 @@ private extension MyAppsViewController
     func makeActiveAppsDataSource() -> FetchedResultsCollectionViewPrefetchingDataSource<InstalledApp, UIImage>
     {
         let fetchRequest = InstalledApp.activeAppsFetchRequest()
+        self.activeAppsBasePredicate = fetchRequest.predicate
         fetchRequest.relationshipKeyPathsForPrefetching = [#keyPath(InstalledApp.storeApp)]
-        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \InstalledApp.expirationDate, ascending: true),
-                                        NSSortDescriptor(keyPath: \InstalledApp.refreshedDate, ascending: false),
-                                        NSSortDescriptor(keyPath: \InstalledApp.name, ascending: true)]
+        fetchRequest.sortDescriptors = self.sortDescriptors(for: self.selectedSortOption)
         fetchRequest.returnsObjectsAsFaults = false
         
         let dataSource = FetchedResultsCollectionViewPrefetchingDataSource<InstalledApp, UIImage>(fetchRequest: fetchRequest, managedObjectContext: DatabaseManager.shared.viewContext)
@@ -486,7 +586,6 @@ private extension MyAppsViewController
             let tintColor = installedApp.storeApp?.tintColor ?? .altPrimary
             
             let cell = cell as! InstalledAppCollectionViewCell
-            cell.bannerView.setGridPresentation(self.isGridLayout)
             cell.layoutMargins.left = self.view.layoutMargins.left
             cell.layoutMargins.right = self.view.layoutMargins.right
             cell.tintColor = tintColor
@@ -550,15 +649,19 @@ private extension MyAppsViewController
             {
                 cell.bannerView.button.progress = nil
             }
+
+            cell.deactivateBadge?.isHidden = true
+            cell.bannerView.setMinimalInstalledAppPresentation(isGrid: self.isGridLayout)
         }
         dataSource.prefetchHandler = { (item, indexPath) in
             return try await item.loadIcon()
         }
-        dataSource.prefetchCompletionHandler = { (cell, image, indexPath, error) in
+        dataSource.prefetchCompletionHandler = { [weak self] (cell, image, indexPath, error) in
             let cell = cell as! InstalledAppCollectionViewCell
             cell.bannerView.iconImageView.image = image
             cell.bannerView.updateAppearanceForAppIcon()
             cell.bannerView.iconImageView.isIndicatingActivity = false
+            self?.applyMinimalPresentation(to: cell)
         }
         
         return dataSource
@@ -569,9 +672,8 @@ private extension MyAppsViewController
         let fetchRequest = InstalledApp.fetchRequest() as NSFetchRequest<InstalledApp>
         fetchRequest.relationshipKeyPathsForPrefetching = [#keyPath(InstalledApp.storeApp)]
         fetchRequest.predicate = NSPredicate(format: "%K == NO", #keyPath(InstalledApp.isActive))
-        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \InstalledApp.expirationDate, ascending: true),
-                                        NSSortDescriptor(keyPath: \InstalledApp.refreshedDate, ascending: false),
-                                        NSSortDescriptor(keyPath: \InstalledApp.name, ascending: true)]
+        self.inactiveAppsBasePredicate = fetchRequest.predicate
+        fetchRequest.sortDescriptors = self.sortDescriptors(for: self.selectedSortOption)
         fetchRequest.returnsObjectsAsFaults = false
         
         let dataSource = FetchedResultsCollectionViewPrefetchingDataSource<InstalledApp, UIImage>(fetchRequest: fetchRequest, managedObjectContext: DatabaseManager.shared.viewContext)
@@ -580,7 +682,6 @@ private extension MyAppsViewController
             let tintColor = installedApp.storeApp?.tintColor ?? .altPrimary
             
             let cell = cell as! InstalledAppCollectionViewCell
-            cell.bannerView.setGridPresentation(self.isGridLayout)
             cell.layoutMargins.left = self.view.layoutMargins.left
             cell.layoutMargins.right = self.view.layoutMargins.right
             cell.tintColor = UIColor.gray
@@ -631,15 +732,19 @@ private extension MyAppsViewController
             {
                 cell.bannerView.button.progress = nil
             }
+
+            cell.deactivateBadge?.isHidden = true
+            cell.bannerView.setMinimalInstalledAppPresentation(isGrid: self.isGridLayout)
         }
         dataSource.prefetchHandler = { (item, indexPath) in
             return try await item.loadIcon()
         }
-        dataSource.prefetchCompletionHandler = { (cell, image, indexPath, error) in
+        dataSource.prefetchCompletionHandler = { [weak self] (cell, image, indexPath, error) in
             let cell = cell as! InstalledAppCollectionViewCell
             cell.bannerView.iconImageView.image = image
             cell.bannerView.updateAppearanceForAppIcon()
             cell.bannerView.iconImageView.isIndicatingActivity = false
+            self?.applyMinimalPresentation(to: cell)
         }
         
         return dataSource
@@ -958,9 +1063,13 @@ private extension MyAppsViewController
     
     @IBAction func sideloadApp(_ sender: UIBarButtonItem)
     {
+        self.presentInstallAppMenu()
+    }
+
+    func presentInstallAppMenu()
+    {
         InstallAppDialog.presentSourceSelection(
             from: self,
-            barButtonItem: sender,
             onChooseFiles: { [weak self] in
                 #if !os(tvOS)
                 self?.presentDocumentPicker()
@@ -1004,11 +1113,9 @@ private extension MyAppsViewController
     func sideloadApp(at url: URL, completion: @escaping (Result<Void, Error>) -> Void)
     {
         self.pendingImportURL = nil
-        self.navigationItem.leftBarButtonItem?.isIndicatingActivity = true
         
         let group = AppManager.shared.install(.url(url), presentingViewController: self) { [weak self] result in
             Task { @MainActor in
-                self?.navigationItem.leftBarButtonItem?.isIndicatingActivity = false
                 self?.sideloadingProgressView.observedProgress = nil
                 self?.sideloadingProgressView.setHidden(true, animated: true)
                 
@@ -1943,20 +2050,9 @@ private extension MyAppsViewController
 
 extension MyAppsViewController
 {
-    @objc private func toggleAppLayout()
+    func updateSearchResults(for searchController: UISearchController)
     {
-        isGridLayout.toggle()
-        UserDefaults.standard.set(isGridLayout, forKey: "SideStoreAppGridLayout")
-        appLayoutButton?.image = UIImage(systemName: isGridLayout ? "list.bullet" : "square.grid.2x2")
-        appLayoutButton?.accessibilityLabel = NSLocalizedString(
-            isGridLayout ? "Show apps as a list" : "Show apps as a grid",
-            comment: ""
-        )
-
-        cachedUpdateSizes.removeAll()
-        collectionView.collectionViewLayout.invalidateLayout()
-        let appSections = IndexSet([Section.activeApps.rawValue, Section.inactiveApps.rawValue])
-        collectionView.reloadSections(appSections)
+        applyAppSearchAndSorting()
     }
 
     override func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView
@@ -2008,12 +2104,10 @@ extension MyAppsViewController
                     headerView.textLabel.text = NSLocalizedString("Active", comment: "")
                 }
                 
+                headerView.button.isHidden = true
                 headerView.button.isIndicatingActivity = false
-                headerView.button.activityIndicatorView.color = .altPrimary
-                headerView.button.setTitle(NSLocalizedString("Refresh All", comment: ""), for: .normal)
-                headerView.button.addTarget(self, action: #selector(MyAppsViewController.refreshAllApps(_:)), for: .primaryActionTriggered)
-                
-                headerView.button.layoutIfNeeded()
+                headerView.button.setTitle(nil, for: .normal)
+                headerView.button.setImage(nil, for: .normal)
                 
                 if self.isRefreshingAllApps
                 {
@@ -2041,10 +2135,10 @@ extension MyAppsViewController
                 headerView.textLabel.textColor = .secondaryLabel
                 headerView.button.tintColor = .altPrimary
                 headerView.textLabel.text = NSLocalizedString("Inactive", comment: "")
+                headerView.button.isHidden = true
                 headerView.button.setTitle(nil, for: .normal)
-                headerView.button.setImage(UIImage(systemName: "questionmark.circle"), for: .normal)
-                headerView.button.addTarget(self, action: #selector(MyAppsViewController.presentInactiveAppsAlert), for: .primaryActionTriggered)
-                
+                headerView.button.setImage(nil, for: .normal)
+
                 headerView.isHidden = (self.inactiveAppsDataSource.itemCount == 0)
             }
             
@@ -2090,8 +2184,15 @@ extension MyAppsViewController
         case .updates:
             guard let cell = collectionView.cellForItem(at: indexPath) else { break }
             self.performSegue(withIdentifier: "showUpdate", sender: cell)
-            
-        default: break
+
+        case .activeApps:
+            self.open(self.dataSource.item(at: indexPath))
+
+        case .inactiveApps:
+            self.activate(self.dataSource.item(at: indexPath))
+
+        case .noUpdates:
+            break
         }
     }
 }
@@ -2478,9 +2579,9 @@ extension MyAppsViewController: UICollectionViewDelegateFlowLayout
                 let spacing: CGFloat = 12
                 let sideInset: CGFloat = 20
                 let width = max(140, floor((collectionView.bounds.width - (sideInset * 2) - spacing) / 2))
-                return CGSize(width: width, height: 174)
+                return CGSize(width: width, height: 126)
             }
-            return CGSize(width: collectionView.bounds.width, height: 88)
+            return CGSize(width: collectionView.bounds.width, height: 76)
         }
     }
     

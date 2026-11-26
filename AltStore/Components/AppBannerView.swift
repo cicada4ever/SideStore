@@ -150,6 +150,49 @@ class AppBannerView: NibView
         self.setNeedsLayout()
         self.layoutIfNeeded()
     }
+
+    func setMinimalInstalledAppPresentation(isGrid: Bool)
+    {
+        guard self.style == .app else { return }
+
+        self.stackView.axis = isGrid ? .vertical : .horizontal
+        self.stackView.alignment = .center
+        self.stackView.distribution = .fill
+        self.stackView.spacing = isGrid ? 7 : 12
+        self.stackView.directionalLayoutMargins = .zero
+        self.directionalLayoutMargins = .zero
+
+        self.iconImageViewHeightConstraint.constant = isGrid ? 64 : 52
+        self.iconImageView.style = .icon
+        self.iconImageView.contentMode = .scaleAspectFit
+
+        self.titleLabel.font = UIFontMetrics(
+            forTextStyle: isGrid ? .subheadline : .body
+        ).scaledFont(for: .systemFont(ofSize: isGrid ? 14 : 16, weight: .semibold))
+        self.titleLabel.adjustsFontForContentSizeCategory = true
+        self.titleLabel.textAlignment = isGrid ? .center : .natural
+        self.titleLabel.numberOfLines = isGrid ? 2 : 1
+        self.titleLabel.lineBreakMode = .byTruncatingTail
+        self.titleLabel.textColor = .label
+        self.titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        self.titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        self.subtitleLabel.isHidden = true
+        self.buttonLabel.isHidden = true
+        self.button.isHidden = true
+        self.betaBadgeView.isHidden = true
+        self.sourceIconImageView.isHidden = true
+        self.backgroundEffectView.isHidden = true
+        self.backgroundColor = .clear
+        self.layer.cornerRadius = 0
+
+        self.accessibilityView.accessibilityLabel = self.titleLabel.text
+        self.accessibilityView.accessibilityValue = nil
+        self.accessibilityElements = [self.accessibilityView]
+
+        self.setNeedsLayout()
+        self.layoutIfNeeded()
+    }
 }
 
 extension AppBannerView
