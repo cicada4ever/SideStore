@@ -486,21 +486,19 @@ private extension AppBannerView
         switch self.style
         {
         case .app:
-            // Like LiveContainer, let each app's icon provide a restrained accent
-            // for its own card while preserving the system material in the content layer.
-            let accentColor = Self.appIconAccentColor(from: self.iconImageView.image) ?? tintColor ?? .systemBlue
-            self.subtitleLabel.textColor = Self.readableAppIconTextColor(for: accentColor, traitCollection: self.traitCollection)
+            // Keep app content on a neutral system surface; reserve Liquid Glass
+            // for the navigation and control layers.
+            self.subtitleLabel.textColor = .secondaryLabel
             self.directionalLayoutMargins.trailing = self.stackView.directionalLayoutMargins.trailing
-            
+
             self.iconImageViewHeightConstraint.constant = 60
             self.iconImageView.style = .icon
-            
+
             self.titleLabel.textColor = .label
-            
             self.button.style = .pill
-            
-            self.backgroundEffectView.contentView.backgroundColor = UIColor(resource: .blurTint)
-            self.backgroundEffectView.backgroundColor = accentColor.withAlphaComponent(0.5)
+
+            self.backgroundEffectView.contentView.backgroundColor = .secondarySystemBackground
+            self.backgroundEffectView.backgroundColor = .clear
             
         case .source:
             self.subtitleLabel.textColor = tintColor
