@@ -23,6 +23,14 @@ final class SettingsHeaderFooterView: UITableViewHeaderFooterView
         
         self.contentView.layoutMargins = .zero
         self.contentView.preservesSuperviewLayoutMargins = true
+
+        primaryLabel.textColor = .secondaryLabel
+        primaryLabel.font = .preferredFont(forTextStyle: .footnote).withWeight(.semibold)
+        primaryLabel.adjustsFontForContentSizeCategory = true
+        secondaryLabel.textColor = .secondaryLabel
+        secondaryLabel.font = .preferredFont(forTextStyle: .footnote)
+        secondaryLabel.adjustsFontForContentSizeCategory = true
+        button.tintColor = .systemBlue
         
         self.stackView.translatesAutoresizingMaskIntoConstraints = false
         self.contentView.addSubview(self.stackView)
