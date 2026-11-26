@@ -2604,38 +2604,10 @@ extension MyAppsViewController: UICollectionViewDelegateFlowLayout
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForFooterInSection section: Int) -> CGSize
     {
-        let section = Section.allCases[section]
-        
-        func appIDsFooterSize() -> CGSize
-        {
-            guard let _ = self.activeTeam else { return .zero }
-            
-            // let indexPath = IndexPath(row: 0, section: section.rawValue)
-            // let footerView = self.collectionView(collectionView, viewForSupplementaryElementOfKind: UICollectionView.elementKindSectionFooter, at: indexPath) as! InstalledAppsCollectionFooterView
-                        
-            // let size = footerView.systemLayoutSizeFitting(CGSize(width: collectionView.frame.width, height: UIView.layoutFittingExpandedSize.height),
-            //                                               withHorizontalFittingPriority: .required,
-            //                                               verticalFittingPriority: .fittingSizeLevel)
-            // return size
-
-            // NOTE: double dequeue of cell has been discontinued
-            // TODO: Using harcoded value until this is fixed
-            return CGSize(width: collectionView.bounds.width, height: 60.5)
-        }
-        
-        switch section
-        {
-        case .noUpdates: return .zero
-        case .updates: return .zero
-            
-        case .activeApps where self.inactiveAppsDataSource.itemCount == 0: return appIDsFooterSize()
-        case .activeApps: return .zero
-            
-        case .inactiveApps where self.inactiveAppsDataSource.itemCount == 0: return .zero
-        case .inactiveApps: return appIDsFooterSize()
-        }
+        // App ID management remains in the navigation menu rather than occupying space below the app list.
+        return .zero
     }
-    
+
     func collectionView(_ myCV: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets
     {
         let section = Section.allCases[section]
