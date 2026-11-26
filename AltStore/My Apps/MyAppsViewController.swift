@@ -2030,9 +2030,8 @@ extension MyAppsViewController
             self?.setAppLayout(false)
         }
         let viewMenu = UIMenu(
-            title: NSLocalizedString("View", comment: ""),
-            image: UIImage(systemName: "rectangle.grid.2x2"),
-            options: .singleSelection,
+            title: "",
+            options: [.displayInline, .singleSelection],
             children: [gridAction, listAction]
         )
 
