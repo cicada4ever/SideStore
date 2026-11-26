@@ -81,6 +81,7 @@
 		<string>sidestore-com.SideStore.SideStore</string>
 		<string>sidestore-com.SideStore.SideStore.Beta</string>
 		<string>localdevvpn</string>
+		<string>livecontainer</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
