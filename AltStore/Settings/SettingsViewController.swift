@@ -278,7 +278,8 @@ final class SettingsViewController: UITableViewController
             let image = button.configuration?.background.image
             
             button.configuration = nil
-            button.setImage(image, for: .normal)
+            button.setImage(image?.withRenderingMode(.alwaysTemplate), for: .normal)
+            button.tintColor = .secondaryLabel
             button.imageView?.contentMode = .scaleAspectFit
         }
         
