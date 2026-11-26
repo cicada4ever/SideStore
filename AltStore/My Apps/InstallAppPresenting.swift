@@ -8,3 +8,5 @@ import UIKit
 protocol InstallAppPresenting: AnyObject {
     func presentInstallAppMenu()
 }
+
+extension MyAppsViewController: InstallAppPresenting {}
