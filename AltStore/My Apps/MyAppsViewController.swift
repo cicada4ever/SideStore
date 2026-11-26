@@ -122,12 +122,14 @@ class MyAppsViewController: UICollectionViewController
         navigationItem.rightBarButtonItem = menuButton
         configureNavigationMenu()
 
-        navigationItem.searchController = appsSearchController
-        navigationItem.hidesSearchBarWhenScrolling = false
-        definesPresentationContext = true
-        if #available(iOS 17.0, *) {
-            navigationItem.preferredSearchBarPlacement = .stacked
+        if !isGridLayout {
+            navigationItem.searchController = appsSearchController
+            navigationItem.hidesSearchBarWhenScrolling = false
+            if #available(iOS 17.0, *) {
+                navigationItem.preferredSearchBarPlacement = .stacked
+            }
         }
+        definesPresentationContext = true
         
         // Allows us to intercept delegate callbacks.
         self.updatesDataSource.fetchedResultsController.delegate = self
@@ -1990,6 +1992,20 @@ extension MyAppsViewController
         guard self.isGridLayout != isGrid else { return }
         self.isGridLayout = isGrid
         UserDefaults.standard.set(isGrid, forKey: "SideStoreAppGridLayout")
+
+        if isGrid {
+            appsSearchController.isActive = false
+            appsSearchController.searchBar.text = nil
+            applySearchFilter("")
+            navigationItem.searchController = nil
+        } else {
+            navigationItem.searchController = appsSearchController
+            navigationItem.hidesSearchBarWhenScrolling = false
+            if #available(iOS 17.0, *) {
+                navigationItem.preferredSearchBarPlacement = .stacked
+            }
+        }
+
         cachedUpdateSizes.removeAll()
         collectionView.collectionViewLayout.invalidateLayout()
         let appSections = IndexSet([Section.activeApps.rawValue, Section.inactiveApps.rawValue])
