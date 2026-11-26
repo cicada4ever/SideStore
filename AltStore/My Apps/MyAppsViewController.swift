@@ -70,7 +70,7 @@ class MyAppsViewController: UICollectionViewController
     private var cachedUpdateSizes = [String: CGSize]()
     
     private var activeTeam: ALTTeam?
-    private var isGridLayout = UserDefaults.standard.bool(forKey: "SideStoreAppGridLayout")
+    private var isGridLayout = UserDefaults.standard.object(forKey: "SideStoreAppGridLayout") as? Bool ?? true
     private var menuBarButtonItem: UIBarButtonItem?
     private var activeAppsSearchPredicate: NSPredicate?
     private var inactiveAppsSearchPredicate: NSPredicate?
@@ -105,6 +105,8 @@ class MyAppsViewController: UICollectionViewController
     override func viewDidLoad()
     {
         super.viewDidLoad()
+        collectionView.backgroundColor = .systemBackground
+        view.backgroundColor = .systemBackground
 
         let installButton = UIBarButtonItem(
             barButtonSystemItem: .add,
@@ -512,7 +514,7 @@ private extension MyAppsViewController
         let dataSource = FetchedResultsCollectionViewPrefetchingDataSource<InstalledApp, UIImage>(fetchRequest: fetchRequest, managedObjectContext: DatabaseManager.shared.viewContext)
         dataSource.cellIdentifierHandler = { _ in "AppCell" }
         dataSource.cellConfigurationHandler = { (cell, installedApp, indexPath) in
-            let tintColor = installedApp.storeApp?.tintColor ?? .altPrimary
+            let tintColor: UIColor = .systemBlue
             
             let cell = cell as! InstalledAppCollectionViewCell
             cell.bannerView.setGridPresentation(self.isGridLayout)
@@ -606,13 +608,13 @@ private extension MyAppsViewController
         let dataSource = FetchedResultsCollectionViewPrefetchingDataSource<InstalledApp, UIImage>(fetchRequest: fetchRequest, managedObjectContext: DatabaseManager.shared.viewContext)
         dataSource.cellIdentifierHandler = { _ in "AppCell" }
         dataSource.cellConfigurationHandler = { (cell, installedApp, indexPath) in
-            let tintColor = installedApp.storeApp?.tintColor ?? .altPrimary
+            let tintColor: UIColor = .systemBlue
             
             let cell = cell as! InstalledAppCollectionViewCell
             cell.bannerView.setGridPresentation(self.isGridLayout)
             cell.layoutMargins.left = self.view.layoutMargins.left
             cell.layoutMargins.right = self.view.layoutMargins.right
-            cell.tintColor = UIColor.gray
+            cell.tintColor = .systemBlue
             
             if cell.bundleIdentifier != installedApp.bundleIdentifier
             {
