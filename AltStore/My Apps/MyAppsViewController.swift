@@ -392,7 +392,7 @@ private extension MyAppsViewController
             title: NSLocalizedString("Check for Updates", comment: ""),
             image: UIImage(systemName: "arrow.triangle.2.circlepath")
         ) { [weak self] _ in
-            self?.checkForUpdates()
+            self?.performCheckForUpdates(completion: nil)
         }
 
         let sortActions = InstalledAppsSortOption.allCases.map { option in
