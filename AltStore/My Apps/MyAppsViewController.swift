@@ -2042,8 +2042,9 @@ extension MyAppsViewController
             self?.enableLocalDevVPNAndRefreshAllApps()
         }
         let liveContainerAction = UIAction(
-            title: NSLocalizedString("Open LiveContainer", comment: ""),
-            image: UIImage(systemName: "power")
+            title: NSLocalizedString("Shutdown", comment: ""),
+            image: UIImage(systemName: "power"),
+            attributes: .destructive
         ) { [weak self] _ in
             self?.openLiveContainer()
         }
