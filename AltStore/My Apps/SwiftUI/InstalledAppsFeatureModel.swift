@@ -130,29 +130,29 @@ final class InstalledAppsFeatureModel: NSObject, ObservableObject, NSFetchedResu
             return NSCompoundPredicate(andPredicateWithSubpredicates: [base, searchPredicate])
         }
 
-        let nameDescriptor = NSSortDescriptor(keyPath: \\InstalledApp.name, ascending: true)
+        let nameDescriptor = NSSortDescriptor(keyPath: \InstalledApp.name, ascending: true)
         let sortDescriptors: [NSSortDescriptor]
 
         switch self.sortOption {
         case .expiration:
             sortDescriptors = [
-                NSSortDescriptor(keyPath: \\InstalledApp.expirationDate, ascending: true),
-                NSSortDescriptor(keyPath: \\InstalledApp.refreshedDate, ascending: false),
+                NSSortDescriptor(keyPath: \InstalledApp.expirationDate, ascending: true),
+                NSSortDescriptor(keyPath: \InstalledApp.refreshedDate, ascending: false),
                 nameDescriptor
             ]
         case .newest:
             sortDescriptors = [
-                NSSortDescriptor(keyPath: \\InstalledApp.installedDate, ascending: false),
+                NSSortDescriptor(keyPath: \InstalledApp.installedDate, ascending: false),
                 nameDescriptor
             ]
         case .oldest:
             sortDescriptors = [
-                NSSortDescriptor(keyPath: \\InstalledApp.installedDate, ascending: true),
+                NSSortDescriptor(keyPath: \InstalledApp.installedDate, ascending: true),
                 nameDescriptor
             ]
         case .recentlyRefreshed:
             sortDescriptors = [
-                NSSortDescriptor(keyPath: \\InstalledApp.refreshedDate, ascending: false),
+                NSSortDescriptor(keyPath: \InstalledApp.refreshedDate, ascending: false),
                 nameDescriptor
             ]
         case .name:
@@ -165,7 +165,7 @@ final class InstalledAppsFeatureModel: NSObject, ObservableObject, NSFetchedResu
         self.inactiveAppsController.fetchRequest.sortDescriptors = sortDescriptors
         self.updatesController.fetchRequest.predicate = combinedPredicate(base: self.updatesBasePredicate)
         self.updatesController.fetchRequest.sortDescriptors = [
-            NSSortDescriptor(keyPath: \\InstalledApp.refreshedDate, ascending: false),
+            NSSortDescriptor(keyPath: \InstalledApp.storeApp?.latestSupportedVersion?.date, ascending: false),
             nameDescriptor
         ]
 
