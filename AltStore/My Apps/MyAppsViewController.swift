@@ -630,7 +630,10 @@ private extension MyAppsViewController
             cell.bannerView.button.isIndicatingActivity = false
             cell.bannerView.configure(for: installedApp, action: .custom(NSLocalizedString("ACTIVATE", comment: "")))
             
-            cell.bannerView.button.tintColor = tintColor
+            cell.bannerView.button.tintColor = .systemBlue
+            cell.bannerView.titleLabel.textColor = .secondaryLabel
+            cell.bannerView.subtitleLabel.textColor = .tertiaryLabel
+            cell.bannerView.alpha = 0.88
             cell.bannerView.button.removeTarget(self, action: nil, for: .primaryActionTriggered)
             cell.bannerView.button.addTarget(self, action: #selector(MyAppsViewController.activateApp(_:)), for: .primaryActionTriggered)
             cell.bannerView.button.accessibilityLabel = String(format: NSLocalizedString("Activate %@", comment: ""), installedApp.name)
@@ -669,6 +672,9 @@ private extension MyAppsViewController
             cell.bannerView.iconImageView.image = image
             cell.bannerView.updateAppearanceForAppIcon()
             cell.bannerView.iconImageView.isIndicatingActivity = false
+            cell.bannerView.titleLabel.textColor = .secondaryLabel
+            cell.bannerView.subtitleLabel.textColor = .tertiaryLabel
+            cell.bannerView.button.tintColor = .systemBlue
         }
         
         return dataSource
@@ -2667,7 +2673,10 @@ extension MyAppsViewController: UICollectionViewDelegateFlowLayout
             if self.isGridLayout {
                 let spacing: CGFloat = 12
                 let sideInset: CGFloat = 20
-                let width = max(140, floor((collectionView.bounds.width - (sideInset * 2) - spacing) / 2))
+                let availableWidth = max(0, collectionView.bounds.width - (sideInset * 2))
+                let columnCount = max(2, min(4, Int((availableWidth + spacing) / 174)))
+                let totalSpacing = spacing * CGFloat(columnCount - 1)
+                let width = floor((availableWidth - totalSpacing) / CGFloat(columnCount))
                 return CGSize(width: width, height: 174)
             }
             return CGSize(width: collectionView.bounds.width, height: 88)
