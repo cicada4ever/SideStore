@@ -25,7 +25,7 @@ final class SettingsHeaderFooterView: UITableViewHeaderFooterView
         self.contentView.preservesSuperviewLayoutMargins = true
 
         primaryLabel.textColor = .secondaryLabel
-        primaryLabel.font = .preferredFont(forTextStyle: .footnote).withWeight(.semibold)
+        primaryLabel.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(for: .systemFont(ofSize: 13, weight: .semibold))
         primaryLabel.adjustsFontForContentSizeCategory = true
         secondaryLabel.textColor = .secondaryLabel
         secondaryLabel.font = .preferredFont(forTextStyle: .footnote)
