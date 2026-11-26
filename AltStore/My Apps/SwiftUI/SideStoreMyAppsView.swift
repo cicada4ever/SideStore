@@ -90,8 +90,8 @@ struct SideStoreMyAppsView: View {
             titleVisibility: .visible
         ) {
             ForEach(activationCandidates, id: \.objectID) { candidate in
-                Button(candidate.name) {
-                    deactivateForActivationLimit(candidate)
+                Button(action: { deactivateForActivationLimit(candidate) }) {
+                    Text(candidate.name)
                 }
             }
             Button("Cancel", role: .cancel) {
@@ -305,80 +305,61 @@ struct SideStoreMyAppsView: View {
         }
     }
 
+    @ViewBuilder
     private func appContextMenu(_ app: InstalledApp) -> some View {
-        Group {
-            if app.isActive {
-                Button {
-                    refresh(app)
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+        if app.isActive {
+            Button(action: { refresh(app) }) {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .disabled(isManaging(app) || isPledgeInactive(app))
+
+            if app.hasUpdate {
+                Button(action: { update(app) }) {
+                    Label("Update", systemImage: "arrow.down.circle")
                 }
                 .disabled(isManaging(app) || isPledgeInactive(app))
-
-                if app.hasUpdate {
-                    Button {
-                        update(app)
-                    } label: {
-                        Label("Update", systemImage: "arrow.down.circle")
-                    }
-                    .disabled(isManaging(app) || isPledgeInactive(app))
-                }
-
-                Button {
-                    confirmation = .deactivate(app)
-                } label: {
-                    Label("Deactivate", systemImage: "pause.circle")
-                }
-                .disabled(isManaging(app))
-
-                if app.bundleIdentifier != Bundle.Info.appbundleIdentifier {
-                    Button(role: .destructive) {
-                        confirmation = .delete(app)
-                    } label: {
-                        Label("Delete App", systemImage: "trash")
-                    }
-                    .disabled(isManaging(app) || isPledgeInactive(app))
-                }
-
-                Button {
-                    enableJIT(app)
-                } label: {
-                    Label("Enable JIT", systemImage: "bolt")
-                }
-                .disabled(isManaging(app) || isPledgeInactive(app))
-            } else {
-                Button {
-                    activate(app)
-                } label: {
-                    Label("Activate", systemImage: "checkmark.circle")
-                }
-                .disabled(isManaging(app) || isPledgeInactive(app))
-
-                if shouldOfferRemoveForInactiveApp(app) {
-                    Button(role: .destructive) {
-                        confirmation = .remove(app)
-                    } label: {
-                        Label("Remove", systemImage: "minus.circle")
-                    }
-                    .disabled(isManaging(app))
-                }
             }
 
-            if app.isActive || (!UserDefaults.standard.isLegacyDeactivationSupported && UTType(app.installedAppUTI) != nil) {
-                Button {
-                    backup(app)
-                } label: {
-                    Label("Create Backup", systemImage: "archivebox")
-                }
-                .disabled(isManaging(app))
+            Button(action: { confirmation = .deactivate(app) }) {
+                Label("Deactivate", systemImage: "pause.circle")
+            }
+            .disabled(isManaging(app))
 
-                Button {
-                    confirmation = .restore(app)
-                } label: {
-                    Label("Restore Backup", systemImage: "arrow.uturn.backward")
+            if app.bundleIdentifier != Bundle.Info.appbundleIdentifier {
+                Button(action: { confirmation = .delete(app) }) {
+                    Label("Delete App", systemImage: "trash")
+                }
+                .disabled(isManaging(app) || isPledgeInactive(app))
+            }
+
+            Button(action: { enableJIT(app) }) {
+                Label("Enable JIT", systemImage: "bolt")
+            }
+            .disabled(isManaging(app) || isPledgeInactive(app))
+        } else {
+            Button(action: { activate(app) }) {
+                Label("Activate", systemImage: "checkmark.circle")
+            }
+            .disabled(isManaging(app) || isPledgeInactive(app))
+
+            if shouldOfferRemoveForInactiveApp(app) {
+                Button(action: { confirmation = .remove(app) }) {
+                    Label("Remove", systemImage: "minus.circle")
                 }
                 .disabled(isManaging(app))
             }
+        }
+
+        if app.isActive || (!UserDefaults.standard.isLegacyDeactivationSupported && UTType(app.installedAppUTI) != nil) {
+            Button(action: { backup(app) }) {
+                Label("Create Backup", systemImage: "archivebox")
+            }
+            .disabled(isManaging(app))
+
+            Button(action: { confirmation = .restore(app) }) {
+                Label("Restore Backup", systemImage: "arrow.uturn.backward")
+            }
+            .disabled(isManaging(app))
         }
     }
 
@@ -704,6 +685,11 @@ struct SideStoreMyAppsView: View {
         }
     }
 
+    private var supportedIPAContentTypes: [UTType] {
+        let types = UTType.types(tag: "ipa", tagClass: .filenameExtension, conformingTo: nil)
+        return types.isEmpty ? [.data] : types
+    }
+
     private func complete(_ result: Result<InstalledApp, Error>) {
         let failure: Error?
         switch result {
@@ -743,7 +729,7 @@ struct SideStoreMyAppsView: View {
         switch confirmation {
         case .deactivate(let app): return "Deactivate \(app.name)?"
         case .remove(let app): return "Remove \(app.name) from SideStore?"
-        case .delete(let app): return "Delete “\\(app.name)”?"
+        case .delete(let app): return "Delete “\(app.name)”?"
         case .backup(let app): return "Back Up \(app.name)?"
         case .restore(let app): return "Restore \(app.name)?"
         case nil: return "Confirm Action"
@@ -773,22 +759,39 @@ struct SideStoreMyAppsView: View {
     private var confirmationButtons: some View {
         switch confirmation {
         case .deactivate(let app):
-            Button("Deactivate", role: .destructive) { deactivate(app) }
+            Button(action: { deactivate(app) }) {
+                Text("Deactivate")
+            }
+            .tint(.red)
         case .remove(let app):
-            Button("Remove from SideStore", role: .destructive) { removeFromSideStore(app) }
+            Button(action: { removeFromSideStore(app) }) {
+                Text("Remove from SideStore")
+            }
+            .tint(.red)
         case .delete(let app):
-            Button("Remove", role: .destructive) { removeFromSideStore(app) }
-            Button("Delete", role: .destructive) { deleteFromDevice(app) }
+            Button(action: { removeFromSideStore(app) }) {
+                Text("Remove")
+            }
+            .tint(.red)
+            Button(action: { deleteFromDevice(app) }) {
+                Text("Delete")
+            }
+            .tint(.red)
         case .backup(let app):
-            Button("Back Up", role: .none) { backup(app) }
+            Button(action: { backup(app) }) {
+                Text("Back Up")
+            }
         case .restore(let app):
-            Button("Restore", role: .destructive) { restore(app) }
+            Button(action: { restore(app) }) {
+                Text("Restore")
+            }
+            .tint(.red)
         case nil:
             EmptyView()
         }
 
-        Button("Cancel", role: .cancel) {
-            confirmation = nil
+        Button(action: { confirmation = nil }) {
+            Text("Cancel")
         }
     }
 }
