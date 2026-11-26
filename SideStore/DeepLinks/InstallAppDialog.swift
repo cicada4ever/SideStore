@@ -32,6 +32,95 @@ public enum AppImportSourceMode: String, CaseIterable, Identifiable, Sendable {
 }
 
 @MainActor
+private final class InstallSourceSheetViewController: UIViewController
+{
+    private let onChooseFiles: () -> Void
+    private let onChooseURL: () -> Void
+
+    init(onChooseFiles: @escaping () -> Void, onChooseURL: @escaping () -> Void)
+    {
+        self.onChooseFiles = onChooseFiles
+        self.onChooseURL = onChooseURL
+        super.init(nibName: nil, bundle: nil)
+        self.modalPresentationStyle = .pageSheet
+    }
+
+    required init?(coder: NSCoder)
+    {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad()
+    {
+        super.viewDidLoad()
+
+        view.backgroundColor = .systemBackground
+
+        let titleLabel = UILabel()
+        titleLabel.text = NSLocalizedString("Install App", comment: "")
+        titleLabel.font = .preferredFont(forTextStyle: .headline)
+        titleLabel.textColor = .label
+        titleLabel.textAlignment = .center
+
+        let filesButton = makeButton(
+            title: NSLocalizedString("From Files", comment: ""),
+            symbol: "folder",
+            primary: true
+        )
+        filesButton.addAction(UIAction { [weak self] _ in
+            self?.dismiss(animated: true) { self?.onChooseFiles() }
+        }, for: .primaryActionTriggered)
+
+        let urlButton = makeButton(
+            title: NSLocalizedString("From URL", comment: ""),
+            symbol: "link",
+            primary: false
+        )
+        urlButton.addAction(UIAction { [weak self] _ in
+            self?.dismiss(animated: true) { self?.onChooseURL() }
+        }, for: .primaryActionTriggered)
+
+        let stack = UIStackView(arrangedSubviews: [titleLabel, filesButton, urlButton])
+        stack.axis = .vertical
+        stack.alignment = .fill
+        stack.spacing = 14
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -24),
+            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
+            filesButton.heightAnchor.constraint(equalToConstant: 52),
+            urlButton.heightAnchor.constraint(equalToConstant: 52)
+        ])
+    }
+
+    private func makeButton(title: String, symbol: String, primary: Bool) -> UIButton
+    {
+        var configuration = primary ? UIButton.Configuration.filled() : UIButton.Configuration.gray()
+        configuration.title = title
+        configuration.image = UIImage(systemName: symbol)
+        configuration.imagePadding = 10
+        configuration.imagePlacement = .leading
+        configuration.cornerStyle = .large
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 18, bottom: 12, trailing: 18)
+        if primary {
+            configuration.baseBackgroundColor = .systemBlue
+            configuration.baseForegroundColor = .white
+        } else {
+            configuration.baseBackgroundColor = .secondarySystemBackground
+            configuration.baseForegroundColor = .label
+        }
+
+        let button = UIButton(configuration: configuration)
+        button.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        button.accessibilityLabel = title
+        return button
+    }
+}
+
+@MainActor
 public enum InstallAppDialog {
     
     public static func presentSourceSelection(
@@ -44,17 +133,19 @@ public enum InstallAppDialog {
         switch mode {
         case .prompt:
             #if !os(tvOS)
-            let alertController = UIAlertController(
-                title: NSLocalizedString("Install App", comment: ""),
-                message: nil,
-                preferredStyle: .actionSheet
+            let sheet = InstallSourceSheetViewController(
+                onChooseFiles: onChooseFiles,
+                onChooseURL: { [weak presentingVC] in
+                    guard let presentingVC = presentingVC else { return }
+                    self.presentURLInputDialog(from: presentingVC, onConfirm: onConfirm)
+                }
             )
-            if let popover = alertController.popoverPresentationController {
-                popover.barButtonItem = barButtonItem
+            if let presentationController = sheet.sheetPresentationController {
+                presentationController.detents = [.medium()]
+                presentationController.prefersGrabberVisible = true
+                presentationController.preferredCornerRadius = 28
             }
-            alertController.addAction(UIAlertAction(title: NSLocalizedString("Choose from Files", comment: ""), style: .default) { _ in
-                onChooseFiles()
-            })
+            presentingVC.present(sheet, animated: true)
             #else
             let alertController = UIAlertController(
                 title: NSLocalizedString("Install App", comment: ""),
@@ -64,14 +155,12 @@ public enum InstallAppDialog {
             alertController.addAction(UIAlertAction(title: NSLocalizedString("Upload via Web", comment: ""), style: .default) { _ in
                 onChooseFiles()
             })
-            #endif
-            
             alertController.addAction(UIAlertAction(title: NSLocalizedString("Install from URL", comment: ""), style: .default) { _ in
                 self.presentURLInputDialog(from: presentingVC, onConfirm: onConfirm)
             })
             alertController.addAction(UIAlertAction(title: NSLocalizedString("Cancel", comment: ""), style: .cancel))
-            
             presentingVC.present(alertController, animated: true)
+            #endif
 
         case .files:
             onChooseFiles()
