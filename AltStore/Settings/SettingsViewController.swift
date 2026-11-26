@@ -159,7 +159,7 @@ final class SettingsViewController: UITableViewController
     
     #if !os(tvOS)
     override var preferredStatusBarStyle: UIStatusBarStyle {
-        return .lightContent
+        return .default
     }
     #endif
     
@@ -226,14 +226,18 @@ final class SettingsViewController: UITableViewController
     {
         super.viewDidLoad()
         
+        tableView.backgroundColor = .systemGroupedBackground
+        tableView.separatorColor = .separator
+        view.tintColor = .systemBlue
+        navigationController?.navigationBar.tintColor = .systemBlue
+        tabBarController?.tabBar.tintColor = .systemBlue
+
         #if !os(tvOS)
-        // --- iOS 26 fix ---
         if #available(iOS 26.0, *) {
             let appearance = UINavigationBarAppearance()
-            appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-            appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+            appearance.configureWithDefaultBackground()
             navigationController?.navigationBar.standardAppearance = appearance
-            navigationController?.navigationBar.scrollEdgeAppearance = appearance       // required for iOS 26, maybe enforce it in storyboard?
+            navigationController?.navigationBar.scrollEdgeAppearance = appearance
         }
         #endif 
         let nib = UINib(nibName: "SettingsHeaderFooterView", bundle: nil)
@@ -249,14 +253,9 @@ final class SettingsViewController: UITableViewController
         #endif
         self.tableView.addGestureRecognizer(debugModeGestureRecognizer)
         
-        // set the version label to show in settings screen
-        self.versionLabel.attributedText = getVersionAttributedString()
-        self.versionLabel.isUserInteractionEnabled = true
-        self.versionLabel.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(copyVersionLabelTapped)))
-        
-        self.versionLabel.numberOfLines = 0
-        self.versionLabel.lineBreakMode = .byWordWrapping
-        self.versionLabel.setNeedsUpdateConstraints()
+        // Keep build metadata out of the Settings interface.
+        self.versionLabel.isHidden = true
+        self.versionLabel.isUserInteractionEnabled = false
         
         self.tableView.contentInset.bottom = 40
         
@@ -315,8 +314,6 @@ final class SettingsViewController: UITableViewController
             {
                 let appearance = UINavigationBarAppearance()
                 appearance.configureWithDefaultBackground()
-                appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-                appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
                 controller.navigationItem.largeTitleDisplayMode = .always
                 controller.navigationItem.standardAppearance = appearance
                 controller.navigationItem.scrollEdgeAppearance = appearance
