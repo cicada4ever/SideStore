@@ -163,7 +163,7 @@ final class InstalledAppsFeatureModel: NSObject, ObservableObject, NSFetchedResu
         self.inactiveAppsController.fetchRequest.predicate = combinedPredicate(base: self.inactiveBasePredicate)
         self.activeAppsController.fetchRequest.sortDescriptors = sortDescriptors
         self.inactiveAppsController.fetchRequest.sortDescriptors = sortDescriptors
-        self.updatesController.fetchRequest.predicate = combinedPredicate(base: self.updatesBasePredicate)
+        self.updatesController.fetchRequest.predicate = self.updatesBasePredicate
         self.updatesController.fetchRequest.sortDescriptors = [
             NSSortDescriptor(keyPath: \InstalledApp.storeApp?.latestSupportedVersion?.date, ascending: false),
             nameDescriptor

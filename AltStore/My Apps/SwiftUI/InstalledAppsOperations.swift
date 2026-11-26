@@ -147,6 +147,13 @@ struct InstalledAppsOperations {
         )
     }
 
+    func removeDeactivatedFromSideStore(
+        _ app: InstalledApp,
+        completionHandler: @escaping (Result<Void, Error>) -> Void
+    ) {
+        AppManager.shared.removeDeactivatedApp(app, completionHandler: completionHandler)
+    }
+
     func enableJIT(
         for app: InstalledApp,
         completionHandler: @escaping (Result<Void, Error>) -> Void

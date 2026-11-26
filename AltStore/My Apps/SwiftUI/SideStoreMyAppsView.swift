@@ -11,11 +11,12 @@ struct SideStoreMyAppsView: View {
 
     @State private var presenter: UIViewController?
     @State private var isImportingIPA = false
-    @State private var isEnteringInstallURL = false
-    @State private var installURLText = ""
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var confirmation: AppConfirmation?
+    @State private var showAppLimitPrompt = false
+    @State private var pendingActivationApp: InstalledApp?
+    @State private var activationCandidates: [InstalledApp] = []
 
     private let operations = InstalledAppsOperations()
 
@@ -84,17 +85,26 @@ struct SideStoreMyAppsView: View {
             Text(confirmationMessage)
         }
         .confirmationDialog(
-            "Install App",
-            isPresented: $coordinator.isInstallMenuPresented,
+            activationLimitTitle,
+            isPresented: $showAppLimitPrompt,
             titleVisibility: .visible
         ) {
-            Button("Install from File", systemImage: "doc.badge.plus") {
-                isImportingIPA = true
+            ForEach(activationCandidates, id: \.objectID) { candidate in
+                Button(candidate.name) {
+                    deactivateForActivationLimit(candidate)
+                }
             }
-            Button("Install from URL", systemImage: "link") {
-                isEnteringInstallURL = true
+            Button("Cancel", role: .cancel) {
+                pendingActivationApp = nil
+                activationCandidates = []
             }
-            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(activationLimitMessage)
+        }
+        .onChange(of: coordinator.isInstallMenuPresented) { isPresented in
+            guard isPresented else { return }
+            coordinator.isInstallMenuPresented = false
+            presentInstallSourceSelection()
         }
         .fileImporter(
             isPresented: $isImportingIPA,
@@ -103,38 +113,16 @@ struct SideStoreMyAppsView: View {
         ) { result in
             switch result {
             case .success(let urls):
-                guard let url = urls.first else { return }
-                install(from: url)
+                guard let url = urls.first, let presenter else { return }
+                let accessGranted = url.startAccessingSecurityScopedResource()
+                InstallAppDialog.present(ipaURL: url, from: presenter) {
+                    self.install(from: url, securityScopeAlreadyStarted: accessGranted)
+                } onCancel: {
+                    if accessGranted { url.stopAccessingSecurityScopedResource() }
+                }
             case .failure(let error):
                 presentError(error)
             }
-        }
-        .sheet(isPresented: $isEnteringInstallURL) {
-            NavigationView {
-                Form {
-                    Section("App URL") {
-                        TextField("https://example.com/app.ipa", text: $installURLText)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
-                    }
-                }
-                .navigationTitle("Install from URL")
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") {
-                            isEnteringInstallURL = false
-                        }
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Install") {
-                            installFromEnteredURL()
-                        }
-                        .disabled(!isValidInstallURL)
-                    }
-                }
-            }
-            .navigationViewStyle(.stack)
         }
         .alert("Something Went Wrong", isPresented: $showError) {
             Button("OK", role: .cancel) {}
@@ -338,6 +326,22 @@ struct SideStoreMyAppsView: View {
                     Label("Deactivate", systemImage: "pause.circle")
                 }
                 .disabled(isManaging(app))
+
+                if app.bundleIdentifier != Bundle.Info.appbundleIdentifier {
+                    Button(role: .destructive) {
+                        confirmation = .delete(app)
+                    } label: {
+                        Label("Delete App", systemImage: "trash")
+                    }
+                    .disabled(isManaging(app))
+                }
+
+                Button {
+                    enableJIT(app)
+                } label: {
+                    Label("Enable JIT", systemImage: "bolt")
+                }
+                .disabled(isManaging(app))
             } else {
                 Button {
                     activate(app)
@@ -345,43 +349,29 @@ struct SideStoreMyAppsView: View {
                     Label("Activate", systemImage: "checkmark.circle")
                 }
                 .disabled(isManaging(app))
+
+                if shouldOfferRemoveForInactiveApp(app) {
+                    Button(role: .destructive) {
+                        confirmation = .remove(app)
+                    } label: {
+                        Label("Remove", systemImage: "minus.circle")
+                    }
+                    .disabled(isManaging(app))
+                }
             }
 
-            Button {
-                backup(app)
-            } label: {
-                Label("Back Up", systemImage: "archivebox")
-            }
-            .disabled(isManaging(app))
-
-            Button {
-                confirmation = .restore(app)
-            } label: {
-                Label("Restore Backup", systemImage: "arrow.uturn.backward")
-            }
-            .disabled(isManaging(app))
-
-            Button {
-                enableJIT(app)
-            } label: {
-                Label("Enable JIT", systemImage: "bolt")
-            }
-            .disabled(isManaging(app))
-
-            if app.bundleIdentifier != Bundle.Info.appbundleIdentifier {
-                Divider()
-
-                Button(role: .destructive) {
-                    confirmation = .remove(app)
+            if app.isActive || (!UserDefaults.standard.isLegacyDeactivationSupported && UTType(app.installedAppUTI) != nil) {
+                Button {
+                    backup(app)
                 } label: {
-                    Label("Remove from SideStore", systemImage: "minus.circle")
+                    Label("Create Backup", systemImage: "archivebox")
                 }
                 .disabled(isManaging(app))
 
-                Button(role: .destructive) {
-                    confirmation = .delete(app)
+                Button {
+                    confirmation = .restore(app)
                 } label: {
-                    Label("Delete from Device", systemImage: "trash")
+                    Label("Restore Backup", systemImage: "arrow.uturn.backward")
                 }
                 .disabled(isManaging(app))
             }
@@ -433,20 +423,51 @@ struct SideStoreMyAppsView: View {
     private func select(_ app: InstalledApp) {
         guard let presenter else { return }
 
-        if !app.isSideloaded, let storeApp = app.storeApp {
+        if !app.isActive {
+            activate(app)
+            return
+        }
+
+        if app.hasUpdate, let storeApp = app.storeApp {
             let details = UIStoryboard(name: "Main", bundle: nil)
                 .instantiateViewController(withIdentifier: "appViewController") as! AppViewController
             details.app = storeApp
             presenter.navigationController?.pushViewController(details, animated: true)
-        } else {
-            UIApplication.shared.open(app.openAppURL) { success in
-                if !success {
-                    DispatchQueue.main.async {
-                        self.presentErrorMessage("Unable to open \(app.name).")
-                    }
+            return
+        }
+
+        UIApplication.shared.open(app.openAppURL) { success in
+            if !success {
+                DispatchQueue.main.async {
+                    self.presentErrorMessage("Unable to open \\(app.name).")
                 }
             }
         }
+    }
+
+    private func shouldOfferRemoveForInactiveApp(_ app: InstalledApp) -> Bool {
+        if (UserDefaults.standard.legacySideloadedApps ?? []).contains(app.bundleIdentifier) {
+            return true
+        }
+        return !UserDefaults.standard.isLegacyDeactivationSupported
+    }
+
+    private func presentInstallSourceSelection() {
+        guard let presenter else {
+            presentErrorMessage("The install interface is not ready yet.")
+            return
+        }
+
+        InstallAppDialog.presentSourceSelection(
+            from: presenter,
+            mode: UserDefaults.standard.appImportSourceMode,
+            onChooseFiles: {
+                isImportingIPA = true
+            },
+            onConfirm: { url in
+                install(from: url)
+            }
+        )
     }
 
     private func refresh(_ app: InstalledApp) {
@@ -501,10 +522,79 @@ struct SideStoreMyAppsView: View {
     }
 
     private func activate(_ app: InstalledApp) {
-        guard let presenter else { return }
+        pendingActivationApp = app
+        continueActivationIfNeeded()
+    }
+
+    private func continueActivationIfNeeded() {
+        guard let app = pendingActivationApp else { return }
+
+        if let candidates = AppManager.shared.appsToDeactivate(for: app) {
+            guard !candidates.isEmpty else {
+                pendingActivationApp = nil
+                presentErrorMessage("SideStore's active-app limit has been reached, and there are no eligible apps to deactivate.")
+                return
+            }
+            activationCandidates = candidates
+            showAppLimitPrompt = true
+            return
+        }
+
+        guard let presenter else {
+            pendingActivationApp = nil
+            presentErrorMessage("The activation interface is not ready yet.")
+            return
+        }
+
+        pendingActivationApp = nil
+        activationCandidates = []
         operations.activate(app, presentingViewController: presenter) { result in
             self.complete(result)
         }
+    }
+
+    private func deactivateForActivationLimit(_ candidate: InstalledApp) {
+        guard let presenter else {
+            pendingActivationApp = nil
+            return
+        }
+
+        operations.deactivate(candidate, presentingViewController: presenter) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    self.model.reload()
+                    self.continueActivationIfNeeded()
+                case .failure(let error):
+                    self.pendingActivationApp = nil
+                    self.activationCandidates = []
+                    if !(error is CancellationError) {
+                        self.presentError(error)
+                    }
+                }
+            }
+        }
+    }
+
+    private var activationLimitTitle: String {
+        guard let app = pendingActivationApp,
+              UserDefaults.standard.activeAppLimitIncludesExtensions,
+              !app.appExtensions.isEmpty else {
+            return "Cannot Activate More than 3 Apps"
+        }
+        return "Cannot Activate More than 3 Apps and App Extensions"
+    }
+
+    private var activationLimitMessage: String {
+        guard let app = pendingActivationApp,
+              UserDefaults.standard.activeAppLimitIncludesExtensions,
+              !app.appExtensions.isEmpty else {
+            return "Non-developer Apple IDs are limited to 3 active apps. Please choose an app to deactivate."
+        }
+
+        let count = app.appExtensions.count
+        let extensionText = count == 1 ? "app extension" : "app extensions"
+        return "Non-developer Apple IDs are limited to 3 active apps and app extensions. \\(app.name) contains \\(count) \\(extensionText). Please choose an app to deactivate."
     }
 
     private func deactivate(_ app: InstalledApp) {
@@ -522,13 +612,19 @@ struct SideStoreMyAppsView: View {
     }
 
     private func removeFromSideStore(_ app: InstalledApp) {
-        operations.removeFromSideStore(app, presentingViewController: presenter) { result in
+        let completion: (Result<Void, Error>) -> Void = { result in
             DispatchQueue.main.async {
                 if case .failure(let error) = result {
                     self.presentError(error)
                 }
                 self.model.reload()
             }
+        }
+
+        if app.isActive {
+            operations.removeFromSideStore(app, presentingViewController: presenter, completionHandler: completion)
+        } else {
+            operations.removeDeactivatedFromSideStore(app, completionHandler: completion)
         }
     }
 
@@ -558,13 +654,14 @@ struct SideStoreMyAppsView: View {
         }
     }
 
-    private func install(from url: URL) {
+    private func install(from url: URL, securityScopeAlreadyStarted: Bool = false) {
         guard let presenter else {
+            if securityScopeAlreadyStarted { url.stopAccessingSecurityScopedResource() }
             presentErrorMessage("The install interface is not ready yet.")
             return
         }
 
-        let accessGranted = url.startAccessingSecurityScopedResource()
+        let accessGranted = securityScopeAlreadyStarted || url.startAccessingSecurityScopedResource()
         _ = operations.install(from: url, presentingViewController: presenter) { result in
             if accessGranted {
                 url.stopAccessingSecurityScopedResource()
@@ -576,33 +673,6 @@ struct SideStoreMyAppsView: View {
                 self.model.reload()
             }
         }
-    }
-
-    private func installFromEnteredURL() {
-        let value = installURLText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: value) else {
-            presentErrorMessage("Enter a valid app URL.")
-            return
-        }
-        guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else {
-            presentErrorMessage("The app URL must use HTTP or HTTPS.")
-            return
-        }
-
-        isEnteringInstallURL = false
-        install(from: url)
-    }
-
-    private var isValidInstallURL: Bool {
-        guard let url = URL(string: installURLText.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            return false
-        }
-        return ["http", "https"].contains(url.scheme?.lowercased() ?? "") && url.host != nil
-    }
-
-    private var supportedIPAContentTypes: [UTType] {
-        let types = UTType.types(tag: "ipa", tagClass: .filenameExtension, conformingTo: nil)
-        return types.isEmpty ? [.data] : types
     }
 
     private func complete(_ result: Result<InstalledApp, Error>) {
@@ -658,7 +728,7 @@ struct SideStoreMyAppsView: View {
         case .remove:
             return "The app record will be removed from SideStore. This does not uninstall the app from your device."
         case .delete:
-            return "This removes the installed app from your device. Make sure you have a backup if you need its data."
+            return "This will remove the app from SideStore and erase its backup. Choose Remove to keep the app on your device, or Delete to uninstall it."
         case .backup:
             return "Create a backup using SideStore's existing backup operation."
         case .restore:
@@ -676,7 +746,8 @@ struct SideStoreMyAppsView: View {
         case .remove(let app):
             Button("Remove from SideStore", role: .destructive) { removeFromSideStore(app) }
         case .delete(let app):
-            Button("Delete from Device", role: .destructive) { deleteFromDevice(app) }
+            Button("Remove", role: .destructive) { removeFromSideStore(app) }
+            Button("Delete", role: .destructive) { deleteFromDevice(app) }
         case .backup(let app):
             Button("Back Up", role: .none) { backup(app) }
         case .restore(let app):
