@@ -102,7 +102,7 @@ final class TabBarController: UITabBarController, UITabBarControllerDelegate
             self.selectedIndex == Tab.myApps.rawValue,
             let navigationController = self.viewControllers?[Tab.myApps.rawValue] as? UINavigationController
         {
-            isMyAppsRootVisible = navigationController.visibleViewController is MyAppsViewController
+            isMyAppsRootVisible = navigationController.visibleViewController is InstallAppPresenting
         }
         else
         {
@@ -133,10 +133,10 @@ final class TabBarController: UITabBarController, UITabBarControllerDelegate
     {
         guard
             let navigationController = self.viewControllers?[Tab.myApps.rawValue] as? UINavigationController,
-            let myAppsViewController = navigationController.viewControllers.first as? MyAppsViewController
+            let installPresenter = navigationController.viewControllers.first as? InstallAppPresenting
         else { return }
 
-        myAppsViewController.presentInstallAppMenu()
+        installPresenter.presentInstallAppMenu()
     }
 
     func tabBarController(_ tabBarController: UITabBarController, didSelect viewController: UIViewController)
