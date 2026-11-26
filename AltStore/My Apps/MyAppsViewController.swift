@@ -2072,9 +2072,16 @@ extension MyAppsViewController
         )
     }
 
+    @objc private func enableVPNAndRefreshAllApps(_ sender: Any)
+    {
+        enableLocalDevVPNAndRefreshAllApps()
+    }
+
     @MainActor
     private func enableLocalDevVPNAndRefreshAllApps()
     {
+        guard !isRefreshingAllApps else { return }
+
         guard
             let queryURL = URL(string: "localdevvpn://"),
             let enableURL = URL(string: "localdevvpn://enable?scheme=sidestore")
@@ -2225,7 +2232,7 @@ extension MyAppsViewController
                 headerView.button.isIndicatingActivity = false
                 headerView.button.activityIndicatorView.color = .altPrimary
                 headerView.button.setTitle(NSLocalizedString("Refresh All", comment: ""), for: .normal)
-                headerView.button.addTarget(self, action: #selector(MyAppsViewController.refreshAllApps(_:)), for: .primaryActionTriggered)
+                headerView.button.addTarget(self, action: #selector(MyAppsViewController.enableVPNAndRefreshAllApps(_:)), for: .primaryActionTriggered)
                 
                 headerView.button.layoutIfNeeded()
                 
