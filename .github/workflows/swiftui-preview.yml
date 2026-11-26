@@ -54,11 +54,10 @@ jobs:
         env:
           BUILD_LOG_ZIP_PASSWORD: ${{ secrets.BUILD_LOG_ZIP_PASSWORD }}
         run: |
+          set -euo pipefail
           python3 scripts/ci/workflow.py build
-          STATUS=$?
           python3 scripts/ci/workflow.py encrypt-build
           mv SideStore.ipa "SideStore-${MARKETING_VERSION}.ipa"
-          exit "$STATUS"
 
       - name: Save Cache
         if: steps.cache.outputs.cache-hit != 'true'
