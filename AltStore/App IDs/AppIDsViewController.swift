@@ -96,8 +96,25 @@ private extension AppIDsViewController
             
             cell.contentView.preservesSuperviewLayoutMargins = false
             cell.contentView.layoutMargins = UIEdgeInsets(top: 0, left: self.view.layoutMargins.left, bottom: 0, right: self.view.layoutMargins.right)
-                        
-            cell.bannerView.iconImageView.isHidden = true
+            cell.contentView.backgroundColor = .secondarySystemGroupedBackground
+            cell.contentView.layer.cornerRadius = 18
+            cell.contentView.layer.cornerCurve = .continuous
+            cell.contentView.clipsToBounds = true
+            cell.backgroundColor = .clear
+
+            cell.bannerView.iconImageView.isHidden = false
+            cell.bannerView.iconImageView.image = UIImage(systemName: "app.fill")?.withTintColor(.systemBlue, renderingMode: .alwaysOriginal)
+            cell.bannerView.iconImageView.backgroundColor = .tertiarySystemGroupedBackground
+            cell.bannerView.iconImageView.contentMode = .scaleAspectFit
+            cell.bannerView.iconImageView.tintColor = .systemBlue
+            cell.bannerView.titleLabel.font = .preferredFont(forTextStyle: .headline)
+            cell.bannerView.titleLabel.adjustsFontForContentSizeCategory = true
+            cell.bannerView.titleLabel.textColor = .label
+            cell.bannerView.subtitleLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+            cell.bannerView.subtitleLabel.adjustsFontForContentSizeCategory = true
+            cell.bannerView.subtitleLabel.textColor = .secondaryLabel
+            cell.bannerView.subtitleLabel.lineBreakMode = .byTruncatingMiddle
+            cell.bannerView.button.tintColor = .systemBlue
             cell.bannerView.button.isIndicatingActivity = false
             
             cell.bannerView.buttonLabel.text = NSLocalizedString("Expires in", comment: "")
